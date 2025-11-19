@@ -2,6 +2,8 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
+
+// needs redoing using this https://docs.unity.cn/6000.3/Documentation/Manual/urp/render-graph-blit.html
 public class MirrorToWebRTCFeature : ScriptableRendererFeature
 {
     [Header("Output Texture (used by WebRTC) - should simply mirror what main camera sees")]
