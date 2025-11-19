@@ -3,7 +3,6 @@ using UnityEngine;
 
 /// <summary>
 /// Spawns the NetcodeWebRTCSignaling object when network starts.
-/// Attach this to a GameObject in your scene with a reference to the signaling prefab.
 /// </summary>
 public class NetcodeSignalingSpawner : MonoBehaviour
 {

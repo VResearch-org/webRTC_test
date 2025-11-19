@@ -316,7 +316,7 @@ GameObject:
   - component: {fileID: 1293927536}
   - component: {fileID: 1293927535}
   m_Layer: 5
-  m_Name: VideoRenderTexture
+  m_Name: StreamingTarget
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -361,7 +361,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Texture: {fileID: 8400000, guid: 37bfb17c81643c148b72349919972bfc, type: 2}
+  m_Texture: {fileID: 2800000, guid: 4ff91b49a3cff1f4db52188ede3be8d4, type: 3}
   m_UVRect:
     serializedVersion: 2
     x: 0
@@ -873,7 +873,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 1
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
