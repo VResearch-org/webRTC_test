@@ -176,6 +176,34 @@ PrefabInstance:
       propertyPath: m_Name
       value: NetworkManager
       objectReference: {fileID: 0}
+    - target: {fileID: 3620746734922697975, guid: fc5c0399b65730544ad453bdd8e139c7, type: 3}
+      propertyPath: onSignallingSpawned.m_PersistentCalls.m_Calls.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3620746734922697975, guid: fc5c0399b65730544ad453bdd8e139c7, type: 3}
+      propertyPath: onSignallingSpawned.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3620746734922697975, guid: fc5c0399b65730544ad453bdd8e139c7, type: 3}
+      propertyPath: onSignallingSpawned.m_PersistentCalls.m_Calls.Array.data[0].m_Target
+      value: 
+      objectReference: {fileID: 161995114}
+    - target: {fileID: 3620746734922697975, guid: fc5c0399b65730544ad453bdd8e139c7, type: 3}
+      propertyPath: onSignallingSpawned.m_PersistentCalls.m_Calls.Array.data[0].m_CallState
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 3620746734922697975, guid: fc5c0399b65730544ad453bdd8e139c7, type: 3}
+      propertyPath: onSignallingSpawned.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
+      value: Init
+      objectReference: {fileID: 0}
+    - target: {fileID: 3620746734922697975, guid: fc5c0399b65730544ad453bdd8e139c7, type: 3}
+      propertyPath: onSignallingSpawned.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
+      value: SimpleMediaStreamReceiver, Assembly-CSharp
+      objectReference: {fileID: 0}
+    - target: {fileID: 3620746734922697975, guid: fc5c0399b65730544ad453bdd8e139c7, type: 3}
+      propertyPath: onSignallingSpawned.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
+      value: UnityEngine.Object, UnityEngine
+      objectReference: {fileID: 0}
     - target: {fileID: 4189347689057620803, guid: fc5c0399b65730544ad453bdd8e139c7, type: 3}
       propertyPath: m_LocalPosition.x
       value: 445.58588

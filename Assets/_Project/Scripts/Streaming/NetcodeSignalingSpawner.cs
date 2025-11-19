@@ -1,5 +1,6 @@
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.Events;
 
 /// <summary>
 /// Spawns the NetcodeWebRTCSignaling object when network starts.
@@ -9,6 +10,8 @@ public class NetcodeSignalingSpawner : MonoBehaviour
     [SerializeField] private GameObject signalingPrefab;
     [SerializeField] private bool spawnOnHost = true;
     [SerializeField] private bool spawnOnClient = true;
+
+    [SerializeField] UnityEvent onSignallingSpawned;
 
     private GameObject spawnedSignaling;
 
@@ -54,6 +57,7 @@ public class NetcodeSignalingSpawner : MonoBehaviour
         {
             networkObject.Spawn();
             Debug.Log("NetcodeWebRTCSignaling spawned successfully");
+            onSignallingSpawned?.Invoke();
         }
         else
         {
