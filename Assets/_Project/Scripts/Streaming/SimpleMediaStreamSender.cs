@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
-using Firebase.Database;
 using Unity.WebRTC;
+using Unity.Netcode;
 using UnityEngine;
 
 public class SimpleMediaStreamSender : MonoBehaviour
@@ -15,7 +15,7 @@ public class SimpleMediaStreamSender : MonoBehaviour
 
     private RTCPeerConnection connection;
     private VideoStreamTrack videoStreamTrack;
-    private DatabaseReference dbRef;
+    private NetcodeWebRTCSignaling signaling;
 
     private bool answerReceived = false;
     private SessionDescription remoteAnswer;
@@ -25,6 +25,25 @@ public class SimpleMediaStreamSender : MonoBehaviour
 
     void Start()
     {
+        // Wait for Netcode to be ready
+        StartCoroutine(WaitForNetcodeAndInitialize());
+    }
+
+    private IEnumerator WaitForNetcodeAndInitialize()
+    {
+        // Wait for NetworkManager to be available
+        while (NetworkManager.Singleton == null)
+        {
+            yield return null;
+        }
+
+        // Wait for signaling component
+        while (NetcodeWebRTCSignaling.Instance == null || !NetcodeWebRTCSignaling.Instance.IsReady())
+        {
+            yield return null;
+        }
+
+        signaling = NetcodeWebRTCSignaling.Instance;
         InitializeConnection();
     }
 
@@ -37,9 +56,6 @@ public class SimpleMediaStreamSender : MonoBehaviour
                 StopCoroutine(connectionTimeoutCoroutine);
             }
             connectionTimeoutCoroutine = StartCoroutine(ConnectionTimeoutCheck());
-
-            FirebaseDatabase.DefaultInstance.SetPersistenceEnabled(false);
-            dbRef = FirebaseDatabase.DefaultInstance.GetReference("webrtc").Child(roomId);
 
             var config = new RTCConfiguration
             {
@@ -55,15 +71,15 @@ public class SimpleMediaStreamSender : MonoBehaviour
             {
                 try
                 {
-                    var candidateInit = new CandidateInit
+                    if (signaling != null && signaling.IsReady())
                     {
-                        SdpMid = candidate.SdpMid,
-                        SdpMLineIndex = candidate.SdpMLineIndex ?? 0,
-                        Candidate = candidate.Candidate
-                    };
-
-                    string json = candidateInit.ConvertToJSON();
-                    dbRef.Child("candidates/sender").Push().SetRawJsonValueAsync(json);
+                        signaling.SendIceCandidate(
+                            candidate.Candidate,
+                            candidate.SdpMid,
+                            candidate.SdpMLineIndex ?? 0,
+                            true // isSender = true
+                        );
+                    }
                 }
                 catch (Exception e)
                 {
@@ -167,13 +183,14 @@ public class SimpleMediaStreamSender : MonoBehaviour
 
     private void SetupSignalingListeners()
     {
-        dbRef.Child("answer").ValueChanged += (s, args) =>
+        if (signaling == null) return;
+
+        signaling.OnAnswerReceived += (json) =>
         {
-            if (args.Snapshot.Exists && !answerReceived)
+            if (!answerReceived)
             {
                 try
                 {
-                    var json = args.Snapshot.GetRawJsonValue();
                     remoteAnswer = SessionDescription.FromJSON(json);
                     answerReceived = true;
                 }
@@ -185,17 +202,15 @@ public class SimpleMediaStreamSender : MonoBehaviour
             }
         };
 
-        dbRef.Child("candidates/receiver").ChildAdded += (s, args) =>
+        signaling.OnIceCandidateReceived += (candidate, sdpMid, sdpMLineIndex) =>
         {
             try
             {
-                var json = args.Snapshot.GetRawJsonValue();
-                var candidateInit = CandidateInit.FromJSON(json);
                 var init = new RTCIceCandidateInit
                 {
-                    sdpMid = candidateInit.SdpMid,
-                    sdpMLineIndex = candidateInit.SdpMLineIndex,
-                    candidate = candidateInit.Candidate
+                    sdpMid = sdpMid,
+                    sdpMLineIndex = sdpMLineIndex,
+                    candidate = candidate
                 };
                 connection.AddIceCandidate(new RTCIceCandidate(init));
             }
@@ -241,7 +256,10 @@ public class SimpleMediaStreamSender : MonoBehaviour
                 Sdp = offerDesc.sdp
             };
 
-            dbRef.Child("offer").SetRawJsonValueAsync(session.ConvertToJSON());
+            if (signaling != null && signaling.IsReady())
+            {
+                signaling.SendOffer(session.ConvertToJSON());
+            }
         }
         catch (Exception e)
         {
@@ -280,6 +298,12 @@ public class SimpleMediaStreamSender : MonoBehaviour
         if (connectionTimeoutCoroutine != null)
         {
             StopCoroutine(connectionTimeoutCoroutine);
+        }
+
+        if (signaling != null)
+        {
+            signaling.OnAnswerReceived -= null;
+            signaling.OnIceCandidateReceived -= null;
         }
 
         if (connection != null)

@@ -1,10 +1,9 @@
 using System.Collections;
 using Unity.WebRTC;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UI;
-using Firebase.Database;
 using System;
-using System.Collections.Generic;
 
 public class SimpleMediaStreamReceiver : MonoBehaviour
 {
@@ -13,122 +12,38 @@ public class SimpleMediaStreamReceiver : MonoBehaviour
     private string RoomId => UserManager.userName;
 
     private RTCPeerConnection connection;
-    private DatabaseReference dbRef;
+    private NetcodeWebRTCSignaling signaling;
     private bool offerReceived = false;
     private SessionDescription remoteOffer;
-    private bool isRoomCreated = false;
 
     public void Init()
     {
-        CreateRoom();
+        // Wait for Netcode to be ready
+        StartCoroutine(WaitForNetcodeAndInitialize());
+    }
+
+    private IEnumerator WaitForNetcodeAndInitialize()
+    {
+        // Wait for NetworkManager to be available
+        while (NetworkManager.Singleton == null)
+        {
+            yield return null;
+        }
+
+        // Wait for signaling component
+        while (NetcodeWebRTCSignaling.Instance == null || !NetcodeWebRTCSignaling.Instance.IsReady())
+        {
+            yield return null;
+        }
+
+        signaling = NetcodeWebRTCSignaling.Instance;
         InitializeConnection();
-    }
-
-    private void CreateRoom()
-    {
-        try
-        {
-            FirebaseDatabase.DefaultInstance.SetPersistenceEnabled(false);
-            dbRef = FirebaseDatabase.DefaultInstance.GetReference("webrtc").Child(RoomId);
-            
-            // First, check and clean any existing room data
-            dbRef.GetValueAsync().ContinueWith(task =>
-            {
-                if (task.IsFaulted)
-                {
-                    Debug.LogError($"Error checking existing room: {task.Exception}");
-                    return;
-                }
-
-                // If there's existing data, remove it first
-                if (task.Result.Exists)
-                {
-                    Debug.Log($"Found existing room data for {RoomId}, cleaning up...");
-                    dbRef.RemoveValueAsync().ContinueWith(cleanupTask =>
-                    {
-                        if (cleanupTask.IsFaulted)
-                        {
-                            Debug.LogError($"Error cleaning existing room: {cleanupTask.Exception}");
-                            return;
-                        }
-                        CreateNewRoom();
-                    });
-                }
-                else
-                {
-                    CreateNewRoom();
-                }
-            });
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"Error in CreateRoom: {e.Message}");
-        }
-    }
-
-    private void CreateNewRoom()
-    {
-        try
-        {
-            // Create the room structure
-            var roomData = new Dictionary<string, object>
-            {
-                { "created", DateTime.UtcNow.ToString("o") },
-                { "status", "active" }
-            };
-            
-            dbRef.SetValueAsync(roomData).ContinueWith(task =>
-            {
-                if (task.IsFaulted)
-                {
-                    Debug.LogError($"Error creating room: {task.Exception}");
-                }
-                else
-                {
-                    isRoomCreated = true;
-                    Debug.Log($"Room {RoomId} created successfully");
-                }
-            });
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"Error in CreateNewRoom: {e.Message}");
-        }
-    }
-
-    public void CleanupRoom()
-    {
-        if (dbRef != null)
-        {
-            try
-            {
-                // Remove all data in the room
-                dbRef.RemoveValueAsync().ContinueWith(task =>
-                {
-                    if (task.IsFaulted)
-                    {
-                        Debug.LogError($"Error cleaning up room: {task.Exception}");
-                    }
-                    else
-                    {
-                        Debug.Log($"Room {RoomId} cleaned up successfully");
-                        isRoomCreated = false;
-                    }
-                });
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"Error in CleanupRoom: {e.Message}");
-            }
-        }
     }
 
     private void InitializeConnection()
     {
         try
         {
-            FirebaseDatabase.DefaultInstance.SetPersistenceEnabled(false);
-            dbRef = FirebaseDatabase.DefaultInstance.GetReference("webrtc").Child(RoomId);
 
             var config = new RTCConfiguration
             {
@@ -144,15 +59,15 @@ public class SimpleMediaStreamReceiver : MonoBehaviour
             {
                 try
                 {
-                    var candidateInit = new CandidateInit
+                    if (signaling != null && signaling.IsReady())
                     {
-                        SdpMid = candidate.SdpMid,
-                        SdpMLineIndex = candidate.SdpMLineIndex ?? 0,
-                        Candidate = candidate.Candidate
-                    };
-
-                    string json = candidateInit.ConvertToJSON();
-                    dbRef.Child("candidates/receiver").Push().SetRawJsonValueAsync(json);
+                        signaling.SendIceCandidate(
+                            candidate.Candidate,
+                            candidate.SdpMid,
+                            candidate.SdpMLineIndex ?? 0,
+                            false // isSender = false (receiver)
+                        );
+                    }
                 }
                 catch (Exception e)
                 {
@@ -203,36 +118,34 @@ public class SimpleMediaStreamReceiver : MonoBehaviour
 
     private void SetupSignalingListeners()
     {
-        // First, do a one-time check in case the offer already exists
-        dbRef.Child("offer").GetValueAsync().ContinueWith(task =>
+        if (signaling == null) return;
+
+        // Check if offer already exists
+        if (signaling.HasOffer() && !offerReceived)
         {
-            if (task.IsCompleted && task.Result.Exists && !offerReceived)
+            try
             {
-                try
+                var json = signaling.GetCurrentOffer();
+                remoteOffer = SessionDescription.FromJSON(json);
+                offerReceived = true;
+                if (receiveImage != null)
                 {
-                    var json = task.Result.GetRawJsonValue();
-                    remoteOffer = SessionDescription.FromJSON(json);
-                    offerReceived = true;
-                    if (receiveImage != null)
-                    {
-                        receiveImage.gameObject.SetActive(true);
-                    }
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError($"[Receiver] Error parsing initial offer: {e.Message}");
+                    receiveImage.gameObject.SetActive(true);
                 }
             }
-        });
+            catch (Exception e)
+            {
+                Debug.LogError($"[Receiver] Error parsing initial offer: {e.Message}");
+            }
+        }
 
-        // Then set up listeners for future changes
-        dbRef.Child("offer").ValueChanged += (s, args) =>
+        // Listen for new offers
+        signaling.OnOfferReceived += (json) =>
         {
-            if (args.Snapshot.Exists && !offerReceived)
+            if (!offerReceived)
             {
                 try
                 {
-                    var json = args.Snapshot.GetRawJsonValue();
                     remoteOffer = SessionDescription.FromJSON(json);
                     offerReceived = true;
                     if (receiveImage != null)
@@ -247,17 +160,16 @@ public class SimpleMediaStreamReceiver : MonoBehaviour
             }
         };
 
-        dbRef.Child("candidates/sender").ChildAdded += (s, args) =>
+        // Listen for ICE candidates from sender
+        signaling.OnIceCandidateReceived += (candidate, sdpMid, sdpMLineIndex) =>
         {
             try
             {
-                var json = args.Snapshot.GetRawJsonValue();
-                var candidateInit = CandidateInit.FromJSON(json);
                 var init = new RTCIceCandidateInit
                 {
-                    sdpMid = candidateInit.SdpMid,
-                    sdpMLineIndex = candidateInit.SdpMLineIndex,
-                    candidate = candidateInit.Candidate
+                    sdpMid = sdpMid,
+                    sdpMLineIndex = sdpMLineIndex,
+                    candidate = candidate
                 };
                 connection.AddIceCandidate(new RTCIceCandidate(init));
             }
@@ -321,7 +233,10 @@ public class SimpleMediaStreamReceiver : MonoBehaviour
                 Sdp = answerDesc.sdp
             };
 
-            dbRef.Child("answer").SetRawJsonValueAsync(session.ConvertToJSON());
+            if (signaling != null && signaling.IsReady())
+            {
+                signaling.SendAnswer(session.ConvertToJSON());
+            }
         }
         catch (Exception e)
         {
@@ -331,6 +246,12 @@ public class SimpleMediaStreamReceiver : MonoBehaviour
 
     void OnDestroy()
     {
+        if (signaling != null)
+        {
+            signaling.OnOfferReceived -= null;
+            signaling.OnIceCandidateReceived -= null;
+        }
+
         if (connection != null)
         {
             connection.Close();
@@ -341,12 +262,5 @@ public class SimpleMediaStreamReceiver : MonoBehaviour
         {
             receiveImage.texture = null;
         }
-
-        CleanupRoom();
-    }
-
-    void OnApplicationQuit()
-    {
-        CleanupRoom();
     }
 }
