@@ -11,11 +11,12 @@ public class NetcodeWebRTCSignaling : NetworkBehaviour
     public static NetcodeWebRTCSignaling Instance { get; private set; }
 
     // NetworkVariables for signaling data
+    // Initialize with empty string to avoid null reference exceptions during serialization
     private NetworkVariable<NetworkString> offerData = new NetworkVariable<NetworkString>(
-        default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        new NetworkString { Value = string.Empty }, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     
     private NetworkVariable<NetworkString> answerData = new NetworkVariable<NetworkString>(
-        default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        new NetworkString { Value = string.Empty }, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     // Events for signaling
     public event Action<string> OnOfferReceived;
@@ -34,18 +35,22 @@ public class NetcodeWebRTCSignaling : NetworkBehaviour
         }
 
         // Listen for offer changes
+        // Offers are sent by client (sender) to server (receiver)
+        // So server (receiver) needs to receive offers
         offerData.OnValueChanged += (NetworkString previous, NetworkString current) =>
         {
-            if (!string.IsNullOrEmpty(current.Value) && IsClient)
+            if (!string.IsNullOrEmpty(current.Value) && IsServer)
             {
                 OnOfferReceived?.Invoke(current.Value);
             }
         };
 
         // Listen for answer changes
+        // Answers are sent by server (receiver) to client (sender)
+        // So client (sender) needs to receive answers
         answerData.OnValueChanged += (NetworkString previous, NetworkString current) =>
         {
-            if (!string.IsNullOrEmpty(current.Value))
+            if (!string.IsNullOrEmpty(current.Value) && IsClient)
             {
                 OnAnswerReceived?.Invoke(current.Value);
             }
@@ -173,6 +178,11 @@ public struct NetworkString : INetworkSerializable
 
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
     {
+        // Ensure Value is never null during serialization
+        if (Value == null)
+        {
+            Value = string.Empty;
+        }
         serializer.SerializeValue(ref Value);
     }
 }
