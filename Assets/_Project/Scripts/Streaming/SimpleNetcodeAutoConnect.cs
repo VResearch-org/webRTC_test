@@ -40,6 +40,7 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
     private string pendingDiscoveryAddress;
     private ushort pendingDiscoveryPort;
     private bool hasPendingDiscoveryUpdate = false;
+    private bool pendingManualConnectRequest = false;
 
     void Start()
     {
@@ -132,7 +133,7 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
             {
                 StartListeningForHosts();
             }
-
+            pendingManualConnectRequest = true;
             if (!isWaitingForDiscovery)
             {
                 Debug.Log("[NetcodeAutoConnect] Waiting for LAN host discovery before attempting client connection...");
@@ -227,6 +228,8 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
             serverPort = lastDiscoveredPort;
         }
 
+        pendingManualConnectRequest = false;
+
         // Configure transport before starting
         ConfigureTransport();
 
@@ -269,6 +272,10 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
         {
             GUILayout.BeginArea(new Rect(10, 10, 300, 200));
             GUILayout.Label("Netcode Connection");
+            if (enableLanDiscovery && !startAsHost && isWaitingForDiscovery)
+            {
+                GUILayout.Label("Waiting for host broadcast...");
+            }
             
             if (GUILayout.Button("Start Host (Receiver)"))
             {
@@ -277,7 +284,7 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
             
             if (GUILayout.Button("Start Client (Sender)"))
             {
-                StartClient();
+                AttemptConnection();
             }
             
             GUILayout.EndArea();
@@ -482,8 +489,9 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
         if (isWaitingForDiscovery)
         {
             isWaitingForDiscovery = false;
-            if (autoConnectOnStart && !startAsHost)
+            if (!startAsHost && (autoConnectOnStart || pendingManualConnectRequest))
             {
+                pendingManualConnectRequest = false;
                 AttemptConnection();
             }
         }
