@@ -110,8 +110,12 @@ MonoBehaviour:
   startAsHost: 0
   autoConnectOnStart: 1
   connectionTimeout: 10
-  serverAddress: 127.0.0.1
+  serverAddress: 0.0.0.0
   serverPort: 7777
+  enableLanDiscovery: 1
+  discoveryPort: 47777
+  discoveryBroadcastInterval: 1.5
+  discoveryAppId: VRX-WebRTC
 --- !u!114 &1585014041195955876
 MonoBehaviour:
   m_ObjectHideFlags: 0
