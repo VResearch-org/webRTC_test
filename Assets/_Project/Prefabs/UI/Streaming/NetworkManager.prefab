@@ -116,6 +116,14 @@ MonoBehaviour:
   discoveryPort: 47777
   discoveryBroadcastInterval: 1.5
   discoveryAppId: VRX-WebRTC
+  enableRelayFallback: 0
+  lanDiscoveryTimeout: 5
+  relayHostFallbackDelay: 3
+  preferredRelayRegion: 
+  manualRelayJoinCode: 
+  onRelayJoinCodeGenerated:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!114 &1585014041195955876
 MonoBehaviour:
   m_ObjectHideFlags: 0
