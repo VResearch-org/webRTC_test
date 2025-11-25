@@ -320,12 +320,12 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
                 }
             }
             
-            if (GUILayout.Button("Start Host (Receiver)"))
+            if (GUILayout.Button("Start Host (Sender)"))
             {
                 StartHost();
             }
             
-            if (GUILayout.Button("Start Client (Sender)"))
+            if (GUILayout.Button("Start Client (Receiver)"))
             {
                 AttemptConnection();
             }

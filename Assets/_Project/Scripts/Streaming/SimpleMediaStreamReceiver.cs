@@ -16,7 +16,7 @@ public class SimpleMediaStreamReceiver : MonoBehaviour
     private bool offerReceived = false;
     private SessionDescription remoteOffer;
 
-    public void Init()
+    void Start()
     {
         // Wait for Netcode to be ready
         StartCoroutine(WaitForNetcodeAndInitialize());

@@ -35,22 +35,22 @@ public class NetcodeWebRTCSignaling : NetworkBehaviour
         }
 
         // Listen for offer changes
-        // Offers are sent by client (sender) to server (receiver)
-        // So server (receiver) needs to receive offers
+        // Offers are sent by server (sender) to client (receiver)
+        // So client (receiver) needs to receive offers
         offerData.OnValueChanged += (NetworkString previous, NetworkString current) =>
         {
-            if (!string.IsNullOrEmpty(current.Value) && IsServer)
+            if (!string.IsNullOrEmpty(current.Value) && IsClient)
             {
                 OnOfferReceived?.Invoke(current.Value);
             }
         };
 
         // Listen for answer changes
-        // Answers are sent by server (receiver) to client (sender)
-        // So client (sender) needs to receive answers
+        // Answers are sent by client (receiver) to server (sender)
+        // So server (sender) needs to receive answers
         answerData.OnValueChanged += (NetworkString previous, NetworkString current) =>
         {
-            if (!string.IsNullOrEmpty(current.Value) && IsClient)
+            if (!string.IsNullOrEmpty(current.Value) && IsServer)
             {
                 OnAnswerReceived?.Invoke(current.Value);
             }
@@ -69,7 +69,7 @@ public class NetcodeWebRTCSignaling : NetworkBehaviour
     }
 
     /// <summary>
-    /// Send offer (called by sender/client)
+    /// Send offer (called by sender/server)
     /// </summary>
     public void SendOffer(string offerJson)
     {
@@ -90,7 +90,7 @@ public class NetcodeWebRTCSignaling : NetworkBehaviour
     }
 
     /// <summary>
-    /// Send answer (called by receiver)
+    /// Send answer (called by receiver/client)
     /// </summary>
     public void SendAnswer(string answerJson)
     {
@@ -134,11 +134,10 @@ public class NetcodeWebRTCSignaling : NetworkBehaviour
     [ClientRpc]
     private void ReceiveIceCandidateClientRpc(string candidate, string sdpMid, int sdpMLineIndex, bool isSender)
     {
-        // Server receives candidates from sender (isSender=true), Client receives from receiver (isSender=false)
-        // But we want: Server (receiver) gets from sender, Client (sender) gets from receiver
-        // So: if isSender=true, we want receiver (server) to process it
-        //     if isSender=false, we want sender (client) to process it
-        bool shouldProcess = (IsServer && isSender) || (IsClient && !isSender);
+        // Server (sender) receives candidates from receiver (isSender=false), Client (receiver) receives from sender (isSender=true)
+        // So: if isSender=true, we want receiver (client) to process it
+        //     if isSender=false, we want sender (server) to process it
+        bool shouldProcess = (IsServer && !isSender) || (IsClient && isSender);
         
         if (shouldProcess)
         {
