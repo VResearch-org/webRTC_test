@@ -348,11 +348,7 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
             }
             if (enableRelayFallback)
             {
-                if (startAsHost && !string.IsNullOrEmpty(activeRelayJoinCode))
-                {
-                    GUILayout.Label($"Relay code: {activeRelayJoinCode}");
-                }
-                else if (!startAsHost)
+                if (!startAsHost)
                 {
                     GUILayout.Label("Relay code (fallback):");
                     string newCode = GUILayout.TextField(manualRelayJoinCode ?? string.Empty);
@@ -361,13 +357,7 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
                         SetRelayJoinCode(newCode);
                     }
                 }
-            }
-            
-            if (GUILayout.Button("Start Host (Sender)"))
-            {
-                StartHost();
-            }
-            
+            }            
             if (GUILayout.Button("Start Client (Receiver)"))
             {
                 AttemptConnection();

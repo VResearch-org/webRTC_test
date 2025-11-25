@@ -112,11 +112,11 @@ MonoBehaviour:
   connectionTimeout: 10
   serverAddress: 0.0.0.0
   serverPort: 7777
-  enableLanDiscovery: 0
+  enableLanDiscovery: 1
   discoveryPort: 47777
   discoveryBroadcastInterval: 1.5
   discoveryAppId: VRX-WebRTC
-  enableRelayFallback: 1
+  enableRelayFallback: 0
   lanDiscoveryTimeout: 5
   relayHostFallbackDelay: 3
   preferredRelayRegion: 
