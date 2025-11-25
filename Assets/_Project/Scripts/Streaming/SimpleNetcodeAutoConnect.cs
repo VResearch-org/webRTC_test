@@ -233,6 +233,13 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
             return;
         }
 
+        // If LAN discovery is disabled but relay fallback is enabled, start directly in relay mode
+        if (!enableLanDiscovery && enableRelayFallback)
+        {
+            StartHostRelayOnly();
+            return;
+        }
+
         if (enableLanDiscovery)
         {
             StopLanBroadcast();
@@ -246,6 +253,42 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
         if (!success)
         {
             Debug.LogError("[NetcodeAutoConnect] Failed to start as Host");
+        }
+    }
+
+    private async void StartHostRelayOnly()
+    {
+        if (NetworkManager.Singleton == null)
+        {
+            Debug.LogError("[NetcodeAutoConnect] NetworkManager.Singleton is null!");
+            return;
+        }
+
+        Debug.Log("[NetcodeAutoConnect] Starting host in Relay-only mode (LAN discovery disabled).");
+
+        // Stop any LAN discovery if it was running
+        if (enableLanDiscovery)
+        {
+            StopLanBroadcast();
+        }
+
+        // Reset relay state
+        relayModeActive = false;
+        activeRelayJoinCode = string.Empty;
+        hostRelayConfigured = false;
+
+        // Configure relay host first
+        if (!await ConfigureRelayHostAsync())
+        {
+            Debug.LogError("[NetcodeAutoConnect] Failed to configure relay host. Cannot start.");
+            return;
+        }
+
+        // Start host in relay mode
+        bool success = StartHostInternal(TransportMode.Relay);
+        if (!success)
+        {
+            Debug.LogError("[NetcodeAutoConnect] Failed to start as Host in Relay mode");
         }
     }
 
