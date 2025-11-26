@@ -22,6 +22,7 @@ public class NetcodeWebRTCSignaling : NetworkBehaviour
     public event Action<string> OnOfferReceived;
     public event Action<string> OnAnswerReceived;
     public event Action<string, string, int> OnIceCandidateReceived;
+    public event Action<int, int> OnResolutionChangeRequested;
 
     private bool isInitialized = false;
 
@@ -165,6 +166,24 @@ public class NetcodeWebRTCSignaling : NetworkBehaviour
     {
         return isInitialized && IsSpawned;
     }
+
+    /// <summary>
+    /// Request resolution change from client (receiver) to server (sender)
+    /// </summary>
+    public void RequestResolutionChange(int width, int height)
+    {
+        if (IsClient)
+        {
+            RequestResolutionChangeServerRpc(width, height);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestResolutionChangeServerRpc(int width, int height)
+    {
+        // Server receives the request and triggers the event
+        OnResolutionChangeRequested?.Invoke(width, height);
+    }
 }
 
 /// <summary>
@@ -185,4 +204,3 @@ public struct NetworkString : INetworkSerializable
         serializer.SerializeValue(ref Value);
     }
 }
-

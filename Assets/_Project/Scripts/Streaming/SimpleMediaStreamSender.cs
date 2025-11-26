@@ -220,6 +220,11 @@ public class SimpleMediaStreamSender : MonoBehaviour
                 HandleConnectionFailure();
             }
         };
+
+        signaling.OnResolutionChangeRequested += (width, height) =>
+        {
+            ChangeResolution(width, height);
+        };
     }
 
     IEnumerator CreateAndSendOffer()
@@ -293,6 +298,34 @@ public class SimpleMediaStreamSender : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Change the RenderTexture resolution. Called when client requests resolution change.
+    /// </summary>
+    private void ChangeResolution(int width, int height)
+    {
+        if (cameraStream == null)
+        {
+            Debug.LogError("[SimpleMediaStreamSender] Cannot change resolution: cameraStream is null");
+            return;
+        }
+
+        if (width <= 0 || height <= 0)
+        {
+            Debug.LogError($"[SimpleMediaStreamSender] Invalid resolution: {width}x{height}");
+            return;
+        }
+
+        Debug.Log($"[SimpleMediaStreamSender] Changing resolution to {width}x{height}");
+
+        // Simply resize the RenderTexture - WebRTC should handle it automatically
+        cameraStream.Release();
+        cameraStream.width = width;
+        cameraStream.height = height;
+        cameraStream.Create();
+
+        Debug.Log($"[SimpleMediaStreamSender] Resolution changed to {width}x{height}. Testing without renegotiation...");
+    }
+
     void OnDestroy()
     {
         if (connectionTimeoutCoroutine != null)
@@ -304,6 +337,7 @@ public class SimpleMediaStreamSender : MonoBehaviour
         {
             signaling.OnAnswerReceived -= null;
             signaling.OnIceCandidateReceived -= null;
+            signaling.OnResolutionChangeRequested -= null;
         }
 
         if (connection != null)

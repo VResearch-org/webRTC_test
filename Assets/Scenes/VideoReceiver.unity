@@ -417,33 +417,9 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 394063569971654092, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnValueChanged.m_PersistentCalls.m_Calls.Array.size
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 394063569971654092, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 394063569971654092, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
       propertyPath: m_OnValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Target
       value: 
       objectReference: {fileID: 848699179}
-    - target: {fileID: 394063569971654092, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_CallState
-      value: 2
-      objectReference: {fileID: 0}
-    - target: {fileID: 394063569971654092, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
-      value: SetJoinCode
-      objectReference: {fileID: 0}
-    - target: {fileID: 394063569971654092, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
-      value: SimpleNetcodeAutoConnect, Assembly-CSharp
-      objectReference: {fileID: 0}
-    - target: {fileID: 394063569971654092, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
-      value: UnityEngine.Object, UnityEngine
-      objectReference: {fileID: 0}
     - target: {fileID: 678545995171913588, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -501,33 +477,9 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 3064742284061552507, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.size
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 3064742284061552507, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 3064742284061552507, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
       value: 
       objectReference: {fileID: 848699179}
-    - target: {fileID: 3064742284061552507, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_CallState
-      value: 2
-      objectReference: {fileID: 0}
-    - target: {fileID: 3064742284061552507, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
-      value: StartWithRelay
-      objectReference: {fileID: 0}
-    - target: {fileID: 3064742284061552507, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
-      value: SimpleNetcodeAutoConnect, Assembly-CSharp
-      objectReference: {fileID: 0}
-    - target: {fileID: 3064742284061552507, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
-      value: UnityEngine.Object, UnityEngine
-      objectReference: {fileID: 0}
     - target: {fileID: 3753470314386720255, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -607,35 +559,11 @@ PrefabInstance:
     - target: {fileID: 6828653191932663261, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7503574693036676149, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.size
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7503574693036676149, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
-      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7503574693036676149, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
       value: 
       objectReference: {fileID: 848699179}
-    - target: {fileID: 7503574693036676149, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_CallState
-      value: 2
-      objectReference: {fileID: 0}
-    - target: {fileID: 7503574693036676149, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
-      value: StartWithLAN
-      objectReference: {fileID: 0}
-    - target: {fileID: 7503574693036676149, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
-      value: SimpleNetcodeAutoConnect, Assembly-CSharp
-      objectReference: {fileID: 0}
-    - target: {fileID: 7503574693036676149, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
-      value: UnityEngine.Object, UnityEngine
-      objectReference: {fileID: 0}
     - target: {fileID: 8106021744566504686, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -730,6 +658,17 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 8106021744566504686, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
   m_PrefabInstance: {fileID: 1386826979}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1386826981 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4820468469712659114, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+  m_PrefabInstance: {fileID: 1386826979}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b743370ac3e4ec2a1668f5455a8ef8a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TMP_Dropdown
 --- !u!1 &1404218194
 GameObject:
   m_ObjectHideFlags: 0
@@ -857,6 +796,51 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &1745342299
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1745342300}
+  - component: {fileID: 1745342301}
+  m_Layer: 0
+  m_Name: ResolutionDropdown
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1745342300
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1745342299}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2012622903}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1745342301
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1745342299}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 84d5175e7474f0e4abf39a2e30b1e123, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::StreamingQualityUI
+  resolutionDropdown: {fileID: 1386826981}
 --- !u!1 &1842062943
 GameObject:
   m_ObjectHideFlags: 0
@@ -1161,6 +1145,7 @@ Transform:
   m_Children:
   - {fileID: 1097434652}
   - {fileID: 161995113}
+  - {fileID: 1745342300}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
