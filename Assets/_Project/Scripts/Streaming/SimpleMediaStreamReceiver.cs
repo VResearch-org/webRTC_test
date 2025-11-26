@@ -4,10 +4,14 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.UI;
 using System;
+using TMPro;
+using System.Linq;
+using System.Reflection;
 
 public class SimpleMediaStreamReceiver : MonoBehaviour
 {
     [SerializeField] private RawImage receiveImage;
+    [SerializeField] private TextMeshProUGUI statsText;
 
     private string RoomId => UserManager.userName;
 
@@ -16,8 +20,32 @@ public class SimpleMediaStreamReceiver : MonoBehaviour
     private bool offerReceived = false;
     private SessionDescription remoteOffer;
 
+    // Statistics tracking
+    private int frameCount = 0;
+    private int totalFramesReceived = 0;
+    private float frameCountTime = 0f;
+    private float currentFramerate = 0f;
+    private RTCPeerConnectionState connectionState = RTCPeerConnectionState.New;
+    private RTCIceConnectionState iceConnectionState = RTCIceConnectionState.New;
+    private long bytesReceived = 0;
+    private long previousBytesReceived = 0;
+    private float bandwidthKbps = 0f;
+    private float rttMs = 0f;
+    private int videoWidth = 0;
+    private int videoHeight = 0;
+    private Coroutine statsUpdateCoroutine;
+    private VideoStreamTrack currentVideoTrack;
+    private Texture previousTexture = null;
+    private ulong previousTextureNativePtr = 0;
+    private float lastFrameTime = 0f;
+    private float[] frameTimeHistory = new float[120]; // Track last 120 frame times
+    private int frameTimeIndex = 0;
+    private int validFrameTimeCount = 0;
+    private float lastStatsUpdateTime = 0f;
+
     void Start()
     {
+        frameCountTime = Time.time;
         // Wait for Netcode to be ready
         StartCoroutine(WaitForNetcodeAndInitialize());
     }
@@ -78,11 +106,13 @@ public class SimpleMediaStreamReceiver : MonoBehaviour
             connection.OnIceConnectionChange = state =>
             {
                 Debug.Log($"ICE state changed to: {state}");
+                iceConnectionState = state;
             };
 
             connection.OnConnectionStateChange = state =>
             {
                 Debug.Log($"Connection state changed to: {state}");
+                connectionState = state;
             };
 
             connection.OnTrack = e =>
@@ -91,13 +121,51 @@ public class SimpleMediaStreamReceiver : MonoBehaviour
                 {
                     if (e.Track is VideoStreamTrack video)
                     {
+                        currentVideoTrack = video;
                         video.OnVideoReceived += tex =>
                         {
                             if (receiveImage != null)
                             {
                                 receiveImage.texture = tex;
                             }
+                            
+                            // Track framerate - count every frame received
+                            frameCount++;
+                            totalFramesReceived++;
+                            float currentTime = Time.time;
+                            
+                            if (lastFrameTime > 0)
+                            {
+                                float frameDelta = currentTime - lastFrameTime;
+                                if (frameDelta > 0 && frameDelta < 1.0f) // Only count reasonable frame times
+                                {
+                                    frameTimeHistory[frameTimeIndex] = frameDelta;
+                                    frameTimeIndex = (frameTimeIndex + 1) % frameTimeHistory.Length;
+                                    if (validFrameTimeCount < frameTimeHistory.Length)
+                                        validFrameTimeCount++;
+                                }
+                            }
+                            lastFrameTime = currentTime;
+                            
+                            if (tex != null)
+                            {
+                                videoWidth = tex.width;
+                                videoHeight = tex.height;
+                                // Track texture by native pointer to detect actual updates
+                                try
+                                {
+                                    IntPtr nativePtr = tex.GetNativeTexturePtr();
+                                    previousTextureNativePtr = (ulong)nativePtr.ToInt64();
+                                }
+                                catch { }
+                            }
                         };
+                        
+                        // Start statistics collection once we have a track
+                        if (statsUpdateCoroutine == null)
+                        {
+                            statsUpdateCoroutine = StartCoroutine(UpdateStatistics());
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -187,6 +255,13 @@ public class SimpleMediaStreamReceiver : MonoBehaviour
             offerReceived = false;
             StartCoroutine(CreateAndSendAnswer());
         }
+        
+        // Update resolution from texture if available
+        if (receiveImage != null && receiveImage.texture != null)
+        {
+            videoWidth = receiveImage.texture.width;
+            videoHeight = receiveImage.texture.height;
+        }
     }
 
     IEnumerator CreateAndSendAnswer()
@@ -244,8 +319,303 @@ public class SimpleMediaStreamReceiver : MonoBehaviour
         }
     }
 
+    private IEnumerator UpdateStatistics()
+    {
+        // Wait a bit for connection to establish
+        yield return new WaitForSeconds(1f);
+        
+        while (connection != null)
+        {
+            yield return new WaitForSeconds(0.5f); // Update every 0.5 seconds
+
+            // Calculate framerate using multiple methods
+            float deltaTime = Time.time - frameCountTime;
+            if (deltaTime >= 1.0f)
+            {
+                if (frameCount > 0)
+                {
+                    currentFramerate = frameCount / deltaTime;
+                }
+                frameCount = 0;
+                frameCountTime = Time.time;
+            }
+            
+            // Calculate FPS from frame time history (more accurate and responsive)
+            if (validFrameTimeCount > 0)
+            {
+                float avgFrameTime = 0f;
+                int validFrames = 0;
+                for (int i = 0; i < validFrameTimeCount; i++)
+                {
+                    int idx = (frameTimeIndex - validFrameTimeCount + i + frameTimeHistory.Length) % frameTimeHistory.Length;
+                    if (frameTimeHistory[idx] > 0 && frameTimeHistory[idx] < 1.0f)
+                    {
+                        avgFrameTime += frameTimeHistory[idx];
+                        validFrames++;
+                    }
+                }
+                if (validFrames > 0)
+                {
+                    avgFrameTime /= validFrames;
+                    if (avgFrameTime > 0.001f) // Avoid division by very small numbers
+                    {
+                        float calculatedFPS = 1f / avgFrameTime;
+                        // Use the frame time history method if we have enough data (more accurate)
+                        if (validFrames >= 5)
+                        {
+                            currentFramerate = calculatedFPS;
+                        }
+                        else if (currentFramerate <= 0 && validFrames > 0)
+                        {
+                            // Use it even with less data if we don't have a better estimate
+                            currentFramerate = calculatedFPS;
+                        }
+                    }
+                }
+            }
+
+            // Get WebRTC statistics
+            if (connection != null)
+            {
+                var statsOp = connection.GetStats();
+                yield return statsOp;
+
+                if (!statsOp.IsError && statsOp.Value != null)
+                {
+                    try
+                    {
+                        var stats = statsOp.Value;
+                        
+                        // Debug: Log all stat types to see what's available
+                        bool foundVideoStats = false;
+                        
+                        // Find inbound RTP stats for video
+                        foreach (var stat in stats.Stats.Values)
+                        {
+                            try
+                            {
+                                var statType = stat.GetType();
+                                string statName = statType.Name;
+                                
+                                // Try multiple property access methods
+                                var allProps = statType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+                                
+                                // Check if it's an inbound RTP stream stats
+                                if (statName.Contains("InboundRtp") || statName.Contains("RTCInboundRtp") || 
+                                    statName.Contains("inbound-rtp") || statName.Contains("RTCInboundRTPStreamStats"))
+                                {
+                                    // Try to get mediaType property
+                                    PropertyInfo mediaTypeProp = null;
+                                    foreach (var prop in allProps)
+                                    {
+                                        if (prop.Name.Equals("mediaType", StringComparison.OrdinalIgnoreCase) ||
+                                            prop.Name.Equals("MediaType", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            mediaTypeProp = prop;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if (mediaTypeProp != null)
+                                    {
+                                        var mediaType = mediaTypeProp.GetValue(stat)?.ToString();
+                                        if (mediaType != null && (mediaType == "video" || mediaType.Contains("video")))
+                                        {
+                                            foundVideoStats = true;
+                                            
+                                            // Get bytesReceived - try multiple property names and variations
+                                            PropertyInfo bytesProp = null;
+                                            string[] possibleNames = { "bytesReceived", "BytesReceived", "bytes_received", 
+                                                                      "bytes", "Bytes", "totalBytesReceived", "TotalBytesReceived" };
+                                            
+                                            foreach (var propName in possibleNames)
+                                            {
+                                                foreach (var prop in allProps)
+                                                {
+                                                    if (prop.Name.Equals(propName, StringComparison.OrdinalIgnoreCase))
+                                                    {
+                                                        bytesProp = prop;
+                                                        break;
+                                                    }
+                                                }
+                                                if (bytesProp != null) break;
+                                            }
+                                            
+                                            if (bytesProp != null)
+                                            {
+                                                try
+                                                {
+                                                    var bytesValue = bytesProp.GetValue(stat);
+                                                    if (bytesValue != null)
+                                                    {
+                                                        long bytes = 0;
+                                                        if (bytesValue is long l) bytes = l;
+                                                        else if (bytesValue is ulong ul) bytes = (long)ul;
+                                                        else if (bytesValue is int i) bytes = i;
+                                                        else if (bytesValue is uint ui) bytes = ui;
+                                                        else if (bytesValue is double d) bytes = (long)d;
+                                                        else if (bytesValue is float f) bytes = (long)f;
+                                                        else if (!long.TryParse(bytesValue.ToString(), out bytes))
+                                                        {
+                                                            // Try as string with number
+                                                            string str = bytesValue.ToString();
+                                                            if (str.Contains("."))
+                                                            {
+                                                                if (double.TryParse(str, out double db)) bytes = (long)db;
+                                                            }
+                                                        }
+                                                        
+                                                        if (bytes > 0)
+                                                        {
+                                                            bytesReceived = bytes;
+                                                            
+                                                            // Calculate bandwidth
+                                                            if (previousBytesReceived > 0)
+                                                            {
+                                                                long bytesDelta = bytesReceived - previousBytesReceived;
+                                                                if (bytesDelta > 0)
+                                                                {
+                                                                    bandwidthKbps = (bytesDelta * 8) / 1000f / 0.5f;
+                                                                }
+                                                            }
+                                                            previousBytesReceived = bytesReceived;
+                                                        }
+                                                    }
+                                                }
+                                                catch (Exception ex)
+                                                {
+                                                    // Skip if we can't parse
+                                                }
+                                            }
+                                            
+                                            // Get RTT - try multiple property names
+                                            PropertyInfo rttProp = null;
+                                            foreach (var prop in allProps)
+                                            {
+                                                if (prop.Name.Equals("roundTripTime", StringComparison.OrdinalIgnoreCase) ||
+                                                    prop.Name.Equals("RoundTripTime", StringComparison.OrdinalIgnoreCase) ||
+                                                    prop.Name.Equals("rtt", StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    rttProp = prop;
+                                                    break;
+                                                }
+                                            }
+                                            
+                                            if (rttProp != null)
+                                            {
+                                                var rttValue = rttProp.GetValue(stat);
+                                                if (rttValue != null)
+                                                {
+                                                    float rtt = 0f;
+                                                    if (rttValue is float f) rtt = f;
+                                                    else if (rttValue is double d) rtt = (float)d;
+                                                    else float.TryParse(rttValue.ToString(), out rtt);
+                                                    
+                                                    if (rtt > 0) rttMs = rtt * 1000f;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Check for ICE candidate pair stats for RTT
+                                if (statName.Contains("IceCandidatePair") || statName.Contains("RTCIceCandidatePair") ||
+                                    statName.Contains("candidate-pair") || statName.Contains("RTCIceCandidatePairStats"))
+                                {
+                                    PropertyInfo rttProp = null;
+                                    var allProps2 = statType.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+                                    foreach (var prop in allProps2)
+                                    {
+                                        if (prop.Name.Equals("currentRoundTripTime", StringComparison.OrdinalIgnoreCase) ||
+                                            prop.Name.Equals("CurrentRoundTripTime", StringComparison.OrdinalIgnoreCase) ||
+                                            prop.Name.Equals("rtt", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            rttProp = prop;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if (rttProp != null)
+                                    {
+                                        var rttValue = rttProp.GetValue(stat);
+                                        if (rttValue != null)
+                                        {
+                                            float rtt = 0f;
+                                            if (rttValue is float f) rtt = f;
+                                            else if (rttValue is double d) rtt = (float)d;
+                                            else float.TryParse(rttValue.ToString(), out rtt);
+                                            
+                                            if (rtt > 0) rttMs = rtt * 1000f;
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                // Skip stats we can't parse
+                                continue;
+                            }
+                        }
+                        
+                        // If we still don't have bandwidth, try estimating from texture size and framerate
+                        if (bandwidthKbps <= 0 && currentFramerate > 0 && videoWidth > 0 && videoHeight > 0)
+                        {
+                            // Rough estimate: width * height * 3 bytes (RGB) * framerate * compression factor (0.1-0.3 for video codecs)
+                            float estimatedBytesPerFrame = videoWidth * videoHeight * 3f * 0.15f; // Assume 15% compression
+                            float estimatedBytesPerSecond = estimatedBytesPerFrame * currentFramerate;
+                            bandwidthKbps = (estimatedBytesPerSecond * 8) / 1000f;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        // Silently handle stats errors to avoid spam
+                        // Debug.LogWarning($"Error parsing stats: {e.Message}");
+                    }
+                }
+            }
+
+            // Update UI text
+            UpdateStatsText();
+        }
+    }
+
+    private void UpdateStatsText()
+    {
+        if (statsText == null) return;
+
+        string stats = "=== Stream Statistics ===\n\n";
+        
+        stats += $"<b>Connection State:</b> {connectionState}\n";
+        stats += $"<b>ICE State:</b> {iceConnectionState}\n";
+        stats += $"<b>Latency (RTT):</b> {rttMs:F0} ms\n";
+        stats += $"<b>Bandwidth:</b> {bandwidthKbps:F1} kbps\n";
+        
+        if (videoWidth > 0 && videoHeight > 0)
+        {
+            stats += $"<b>Resolution:</b> {videoWidth}x{videoHeight}\n";
+        }
+
+        statsText.text = stats;
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        if (bytes < 1024)
+            return $"{bytes} B";
+        else if (bytes < 1024 * 1024)
+            return $"{bytes / 1024f:F2} KB";
+        else
+            return $"{bytes / (1024f * 1024f):F2} MB";
+    }
+
     void OnDestroy()
     {
+        if (statsUpdateCoroutine != null)
+        {
+            StopCoroutine(statsUpdateCoroutine);
+            statsUpdateCoroutine = null;
+        }
+
         if (signaling != null)
         {
             signaling.OnOfferReceived -= null;
