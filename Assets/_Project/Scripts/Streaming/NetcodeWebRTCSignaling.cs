@@ -23,6 +23,10 @@ public class NetcodeWebRTCSignaling : NetworkBehaviour
     public event Action<string> OnAnswerReceived;
     public event Action<string, string, int> OnIceCandidateReceived;
     public event Action<int, int> OnResolutionChangeRequested;
+    public event Action<bool> OnPlayPauseRequested; // true = play, false = pause
+    public event Action<float> OnVideoProgressUpdated; // progress 0-1
+    public event Action<float, float> OnVideoTimeUpdated; // currentTime, totalLength
+    public event Action OnSkipBackRequested; // reset video to first frame
 
     private bool isInitialized = false;
 
@@ -183,6 +187,78 @@ public class NetcodeWebRTCSignaling : NetworkBehaviour
     {
         // Server receives the request and triggers the event
         OnResolutionChangeRequested?.Invoke(width, height);
+    }
+
+    /// <summary>
+    /// Request play/pause from client (receiver) to server (sender)
+    /// </summary>
+    public void RequestPlayPause(bool shouldPlay)
+    {
+        if (IsClient)
+        {
+            RequestPlayPauseServerRpc(shouldPlay);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestPlayPauseServerRpc(bool shouldPlay)
+    {
+        // Server receives the request and triggers the event
+        OnPlayPauseRequested?.Invoke(shouldPlay);
+    }
+
+    /// <summary>
+    /// Send video progress from server (sender) to client (receiver)
+    /// </summary>
+    public void SendVideoProgress(float progress)
+    {
+        if (IsServer)
+        {
+            SendVideoProgressClientRpc(progress);
+        }
+    }
+
+    [ClientRpc]
+    private void SendVideoProgressClientRpc(float progress)
+    {
+        // Client (receiver) receives the progress update
+        OnVideoProgressUpdated?.Invoke(progress);
+    }
+
+    /// <summary>
+    /// Send video time information from server (sender) to client (receiver)
+    /// </summary>
+    public void SendVideoTime(float currentTime, float totalLength)
+    {
+        if (IsServer)
+        {
+            SendVideoTimeClientRpc(currentTime, totalLength);
+        }
+    }
+
+    [ClientRpc]
+    private void SendVideoTimeClientRpc(float currentTime, float totalLength)
+    {
+        // Client (receiver) receives the time update
+        OnVideoTimeUpdated?.Invoke(currentTime, totalLength);
+    }
+
+    /// <summary>
+    /// Request skip back (reset to first frame) from client (receiver) to server (sender)
+    /// </summary>
+    public void RequestSkipBack()
+    {
+        if (IsClient)
+        {
+            RequestSkipBackServerRpc();
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestSkipBackServerRpc()
+    {
+        // Server receives the request and triggers the event
+        OnSkipBackRequested?.Invoke();
     }
 }
 
