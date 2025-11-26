@@ -16,32 +16,29 @@ using Unity.Services.Relay;
 using Unity.Services.Relay.Models;
 
 /// <summary>
-/// Simple auto-connect script for two-device setup.
-/// First device becomes Host (Server), second device becomes Client.
+/// Simple connection script for two-device setup.
+/// Provides two public methods: StartWithLAN() and StartWithRelay()
 /// </summary>
 public class SimpleNetcodeAutoConnect : MonoBehaviour
 {
-    [SerializeField] private bool startAsHost = false;
-    [SerializeField] private bool autoConnectOnStart = true;
-    [SerializeField] private float connectionTimeout = 10f;
+    [Header("Role")]
+    [SerializeField] [Tooltip("True for Sender (Host), False for Receiver (Client)")]
+    private bool isHost = false;
+    
     [SerializeField] private string serverAddress = "127.0.0.1";
     [SerializeField] private ushort serverPort = 7777;
     [Header("LAN Discovery")]
-    [SerializeField] private bool enableLanDiscovery = true;
     [SerializeField] private int discoveryPort = 47777;
     [SerializeField] private float discoveryBroadcastInterval = 1.5f;
     [SerializeField] private string discoveryAppId = "VRX-WebRTC";
-    [Header("Relay Fallback")]
-    [SerializeField] private bool enableRelayFallback = true;
-    [SerializeField] private float lanDiscoveryTimeout = 5f;
-    [SerializeField] private float relayHostFallbackDelay = 3f;
+    [Header("Relay")]
     [SerializeField] private string preferredRelayRegion = "";
-    [SerializeField] [Tooltip("Optional manual relay join code for clients.")]
-    private string manualRelayJoinCode = "";
     [SerializeField] private UnityEvent<string> onRelayJoinCodeGenerated;
+    [Header("UI")]
+    [SerializeField] [Tooltip("UI GameObject to hide when connection starts")]
+    private GameObject uiGameObject;
 
-    private bool hasConnected = false;
-    private bool isWaitingForDiscovery = false;
+    private string manualRelayJoinCode = string.Empty;
     private bool isListeningForDiscovery = false;
     private string lastDiscoveredAddress = null;
     private ushort lastDiscoveredPort = 0;
@@ -54,83 +51,23 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
     private string pendingDiscoveryAddress;
     private ushort pendingDiscoveryPort;
     private bool hasPendingDiscoveryUpdate = false;
-    private bool pendingManualConnectRequest = false;
-    private enum TransportMode { Lan, Relay }
-    private TransportMode currentTransportMode = TransportMode.Lan;
     private bool relayModeActive = false;
     private string activeRelayJoinCode = string.Empty;
-    private bool relayClientFallbackTriggered = false;
     private bool hostRelayConfigured = false;
     private bool clientRelayConfigured = false;
     private RelayServerData hostRelayData;
     private RelayServerData clientRelayData;
-    private CancellationTokenSource relayWatchdogCts;
     private Task unityServicesInitTask;
     private bool unityServicesReady = false;
-    private float lanDiscoveryStartTime;
-
-    void Awake()
-    {
-        if (enableRelayFallback)
-        {
-            InitializeUnityServicesIfNeeded();
-        }
-    }
 
     void Start()
     {
         if (NetworkManager.Singleton != null)
         {
-            // Subscribe to connection events for better debugging
             NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
             NetworkManager.Singleton.OnServerStarted += OnServerStarted;
             NetworkManager.Singleton.OnClientStopped += OnClientStopped;
-        }
-
-        if (autoConnectOnStart)
-        {
-            // Small delay to ensure NetworkManager is ready
-            Invoke(nameof(AttemptConnection), 0.5f);
-        }
-
-        if (enableLanDiscovery && !startAsHost)
-        {
-            StartListeningForHosts();
-            isWaitingForDiscovery = true;
-            lanDiscoveryStartTime = Time.unscaledTime;
-        }
-    }
-
-    private void OnServerStarted()
-    {
-        Debug.Log("[NetcodeAutoConnect] Server started successfully");
-        if (enableLanDiscovery && !relayModeActive)
-        {
-            StartLanBroadcast();
-        }
-    }
-
-    private void OnClientConnected(ulong clientId)
-    {
-        Debug.Log($"[NetcodeAutoConnect] Client connected with ID: {clientId}");
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer && clientId != NetworkManager.Singleton.LocalClientId)
-        {
-            CancelRelayFallbackTimer();
-        }
-    }
-
-    private void OnClientDisconnected(ulong clientId)
-    {
-        Debug.LogWarning($"[NetcodeAutoConnect] Client disconnected with ID: {clientId}");
-    }
-
-    private void OnClientStopped(bool wasHost)
-    {
-        Debug.LogWarning($"[NetcodeAutoConnect] Client stopped. Was host: {wasHost}");
-        if (enableLanDiscovery && wasHost)
-        {
-            StopLanBroadcast();
         }
     }
 
@@ -149,176 +86,6 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
 
             ApplyDiscoveredEndpoint(address, port);
         }
-
-        if (!startAsHost && enableRelayFallback && isWaitingForDiscovery)
-        {
-            if (Time.unscaledTime - lanDiscoveryStartTime >= lanDiscoveryTimeout)
-            {
-                Debug.Log("[NetcodeAutoConnect] LAN discovery timed out. Triggering Relay fallback.");
-                isWaitingForDiscovery = false;
-                TryRelayClientFallback();
-            }
-        }
-    }
-
-    private void AttemptConnection()
-    {
-        if (hasConnected || NetworkManager.Singleton == null)
-        {
-            Debug.LogWarning($"[NetcodeAutoConnect] Cannot attempt connection - hasConnected: {hasConnected}, NetworkManager: {NetworkManager.Singleton != null}");
-            return;
-        }
-
-        // Check if already connected
-        if (NetworkManager.Singleton.IsClient || NetworkManager.Singleton.IsServer)
-        {
-            Debug.Log($"[NetcodeAutoConnect] Already connected - IsClient: {NetworkManager.Singleton.IsClient}, IsServer: {NetworkManager.Singleton.IsServer}");
-            hasConnected = true;
-            return;
-        }
-
-        if (!startAsHost)
-        {
-            if (enableLanDiscovery)
-            {
-                if (!HasDiscoveredEndpoint())
-                {
-                    if (!isListeningForDiscovery)
-                    {
-                        StartListeningForHosts();
-                    }
-                    pendingManualConnectRequest = true;
-                    if (!isWaitingForDiscovery)
-                    {
-                        Debug.Log("[NetcodeAutoConnect] Waiting for LAN host discovery before attempting client connection...");
-                        isWaitingForDiscovery = true;
-                        lanDiscoveryStartTime = Time.unscaledTime;
-                    }
-                    return;
-                }
-
-                serverAddress = lastDiscoveredAddress;
-                serverPort = lastDiscoveredPort;
-            }
-            else if (enableRelayFallback)
-            {
-                TryRelayClientFallback();
-                return;
-            }
-        }
-
-        Debug.Log($"[NetcodeAutoConnect] Attempting connection - startAsHost: {startAsHost}");
-
-        if (startAsHost)
-        {
-            StartHost();
-        }
-        else
-        {
-            StartClient();
-        }
-    }
-
-    public void StartHost()
-    {
-        if (NetworkManager.Singleton == null)
-        {
-            Debug.LogError("[NetcodeAutoConnect] NetworkManager.Singleton is null!");
-            return;
-        }
-
-        if (NetworkManager.Singleton.IsServer)
-        {
-            Debug.LogWarning("[NetcodeAutoConnect] Already a server, skipping StartHost");
-            return;
-        }
-
-        // If LAN discovery is disabled but relay fallback is enabled, start directly in relay mode
-        if (!enableLanDiscovery && enableRelayFallback)
-        {
-            StartHostRelayOnly();
-            return;
-        }
-
-        if (enableLanDiscovery)
-        {
-            StopLanBroadcast();
-        }
-
-        relayModeActive = false;
-        activeRelayJoinCode = string.Empty;
-        hostRelayConfigured = false;
-
-        bool success = StartHostInternal(TransportMode.Lan);
-        if (!success)
-        {
-            Debug.LogError("[NetcodeAutoConnect] Failed to start as Host");
-        }
-    }
-
-    private async void StartHostRelayOnly()
-    {
-        if (NetworkManager.Singleton == null)
-        {
-            Debug.LogError("[NetcodeAutoConnect] NetworkManager.Singleton is null!");
-            return;
-        }
-
-        Debug.Log("[NetcodeAutoConnect] Starting host in Relay-only mode (LAN discovery disabled).");
-
-        // Stop any LAN discovery if it was running
-        if (enableLanDiscovery)
-        {
-            StopLanBroadcast();
-        }
-
-        // Reset relay state
-        relayModeActive = false;
-        activeRelayJoinCode = string.Empty;
-        hostRelayConfigured = false;
-
-        // Configure relay host first
-        if (!await ConfigureRelayHostAsync())
-        {
-            Debug.LogError("[NetcodeAutoConnect] Failed to configure relay host. Cannot start.");
-            return;
-        }
-
-        // Start host in relay mode
-        bool success = StartHostInternal(TransportMode.Relay);
-        if (!success)
-        {
-            Debug.LogError("[NetcodeAutoConnect] Failed to start as Host in Relay mode");
-        }
-    }
-
-    public void StartClient()
-    {
-        if (NetworkManager.Singleton == null)
-        {
-            Debug.LogError("[NetcodeAutoConnect] NetworkManager.Singleton is null!");
-            return;
-        }
-
-        if (NetworkManager.Singleton.IsClient)
-        {
-            Debug.LogWarning("[NetcodeAutoConnect] Already a client, skipping StartClient");
-            return;
-        }
-
-        if (enableLanDiscovery && !startAsHost && HasDiscoveredEndpoint())
-        {
-            serverAddress = lastDiscoveredAddress;
-            serverPort = lastDiscoveredPort;
-        }
-
-        pendingManualConnectRequest = false;
-
-        bool success = StartClientInternal(TransportMode.Lan);
-        if (!success && NetworkManager.Singleton != null)
-        {
-            Debug.LogError($"[NetcodeAutoConnect] Failed to start as Client - NetworkManager state IsClient:{NetworkManager.Singleton.IsClient} IsServer:{NetworkManager.Singleton.IsServer} IsHost:{NetworkManager.Singleton.IsHost}");
-        }
     }
 
     void OnDestroy()
@@ -333,37 +100,236 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
 
         StopLanBroadcast();
         StopListeningForHosts();
-        CancelRelayFallbackTimer();
     }
 
-    void OnGUI()
+    /// <summary>
+    /// Start connection using LAN.
+    /// If isHost is true, starts as host. If false, starts listening for hosts and connects as client.
+    /// </summary>
+    public void StartWithLAN()
     {
-        if (!hasConnected && NetworkManager.Singleton != null && !NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer)
+        HideUI();
+        
+        if (NetworkManager.Singleton == null)
         {
-            GUILayout.BeginArea(new Rect(10, 10, 320, 260));
-            GUILayout.Label("Netcode Connection");
-            if (enableLanDiscovery && !startAsHost && isWaitingForDiscovery)
+            Debug.LogError("[NetcodeAutoConnect] NetworkManager.Singleton is null!");
+            return;
+        }
+
+        // Check if already connected
+        if (NetworkManager.Singleton.IsClient || NetworkManager.Singleton.IsServer)
+        {
+            Debug.LogWarning("[NetcodeAutoConnect] Already connected. Ignoring StartWithLAN call.");
+            return;
+        }
+
+        if (isHost)
+        {
+            // Start as host
+            StartHostLAN();
+        }
+        else
+        {
+            // Start listening for hosts and connect as client
+            StartListeningForHosts();
+        }
+    }
+
+    /// <summary>
+    /// Set the relay join code from input field. Call this when the input field value changes.
+    /// </summary>
+    public void SetJoinCode(string joinCode)
+    {
+        manualRelayJoinCode = string.IsNullOrWhiteSpace(joinCode) ? string.Empty : joinCode.Trim().ToUpperInvariant();
+    }
+
+    /// <summary>
+    /// Start connection using Relay.
+    /// If isHost is true, starts as host and generates a join code.
+    /// If isHost is false, starts as client using the join code set via SetJoinCode.
+    /// </summary>
+    public async void StartWithRelay()
+    {
+        HideUI();
+        
+        if (NetworkManager.Singleton == null)
+        {
+            Debug.LogError("[NetcodeAutoConnect] NetworkManager.Singleton is null!");
+            return;
+        }
+
+        // Check if already connected
+        if (NetworkManager.Singleton.IsClient || NetworkManager.Singleton.IsServer)
+        {
+            Debug.LogWarning("[NetcodeAutoConnect] Already connected. Ignoring StartWithRelay call.");
+            return;
+        }
+
+        if (isHost)
+        {
+            // Start as host (generate new code)
+            await StartHostRelay();
+        }
+        else
+        {
+            // Start as client (use provided code)
+            if (string.IsNullOrWhiteSpace(manualRelayJoinCode))
             {
-                GUILayout.Label("Waiting for host broadcast...");
+                Debug.LogError("[NetcodeAutoConnect] Cannot start as client: join code is empty. Set join code via SetJoinCode() first.");
+                return;
             }
-            if (enableRelayFallback)
-            {
-                if (!startAsHost)
-                {
-                    GUILayout.Label("Relay code (fallback):");
-                    string newCode = GUILayout.TextField(manualRelayJoinCode ?? string.Empty);
-                    if (newCode != manualRelayJoinCode)
-                    {
-                        SetRelayJoinCode(newCode);
-                    }
-                }
-            }            
-            if (GUILayout.Button("Start Client (Receiver)"))
-            {
-                AttemptConnection();
-            }
-            
-            GUILayout.EndArea();
+            await StartClientRelay(manualRelayJoinCode);
+        }
+    }
+
+    private void HideUI()
+    {
+        if (uiGameObject != null)
+        {
+            uiGameObject.SetActive(false);
+        }
+    }
+
+    private bool StartHostLAN()
+    {
+        if (NetworkManager.Singleton == null)
+        {
+            return false;
+        }
+
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        if (transport == null)
+        {
+            Debug.LogError("[NetcodeAutoConnect] UnityTransport component not found!");
+            return false;
+        }
+
+        transport.SetConnectionData(serverAddress, serverPort);
+        relayModeActive = false;
+
+        bool success = NetworkManager.Singleton.StartHost();
+        if (success)
+        {
+            Debug.Log($"[NetcodeAutoConnect] Started as Host (LAN) on {serverAddress}:{serverPort}");
+        }
+        return success;
+    }
+
+    private async Task StartHostRelay()
+    {
+        if (NetworkManager.Singleton == null)
+        {
+            Debug.LogError("[NetcodeAutoConnect] NetworkManager.Singleton is null!");
+            return;
+        }
+
+        // Initialize Unity Services if needed
+        if (!await EnsureUnityServicesReadyAsync())
+        {
+            Debug.LogError("[NetcodeAutoConnect] Unity Services are not ready. Cannot start relay host.");
+            return;
+        }
+
+        // Configure relay host
+        if (!await ConfigureRelayHostAsync())
+        {
+            Debug.LogError("[NetcodeAutoConnect] Failed to configure relay host. Cannot start.");
+            return;
+        }
+
+        // Configure transport
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        if (transport == null)
+        {
+            Debug.LogError("[NetcodeAutoConnect] UnityTransport component not found!");
+            return;
+        }
+
+        transport.SetRelayServerData(hostRelayData);
+        relayModeActive = true;
+
+        // Start host
+        bool success = NetworkManager.Singleton.StartHost();
+        if (success)
+        {
+            Debug.Log($"[NetcodeAutoConnect] Started as Host (Relay) with join code: {activeRelayJoinCode}");
+        }
+        else
+        {
+            Debug.LogError("[NetcodeAutoConnect] Failed to start as Host (Relay)");
+        }
+    }
+
+    private async Task StartClientRelay(string joinCode)
+    {
+        if (NetworkManager.Singleton == null)
+        {
+            Debug.LogError("[NetcodeAutoConnect] NetworkManager.Singleton is null!");
+            return;
+        }
+
+        // Initialize Unity Services if needed
+        if (!await EnsureUnityServicesReadyAsync())
+        {
+            Debug.LogError("[NetcodeAutoConnect] Unity Services are not ready. Cannot start relay client.");
+            return;
+        }
+
+        // Configure relay client
+        if (!await ConfigureRelayClientAsync(joinCode))
+        {
+            Debug.LogError("[NetcodeAutoConnect] Failed to configure relay client. Cannot start.");
+            return;
+        }
+
+        // Configure transport
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        if (transport == null)
+        {
+            Debug.LogError("[NetcodeAutoConnect] UnityTransport component not found!");
+            return;
+        }
+
+        transport.SetRelayServerData(clientRelayData);
+        relayModeActive = true;
+
+        // Start client
+        bool success = NetworkManager.Singleton.StartClient();
+        if (success)
+        {
+            Debug.Log($"[NetcodeAutoConnect] Started as Client (Relay) with join code: {joinCode}");
+        }
+        else
+        {
+            Debug.LogError("[NetcodeAutoConnect] Failed to start as Client (Relay)");
+        }
+    }
+
+    private void OnServerStarted()
+    {
+        Debug.Log("[NetcodeAutoConnect] Server started successfully");
+        if (!relayModeActive)
+        {
+            StartLanBroadcast();
+        }
+    }
+
+    private void OnClientConnected(ulong clientId)
+    {
+        Debug.Log($"[NetcodeAutoConnect] Client connected with ID: {clientId}");
+    }
+
+    private void OnClientDisconnected(ulong clientId)
+    {
+        Debug.LogWarning($"[NetcodeAutoConnect] Client disconnected with ID: {clientId}");
+    }
+
+    private void OnClientStopped(bool wasHost)
+    {
+        Debug.LogWarning($"[NetcodeAutoConnect] Client stopped. Was host: {wasHost}");
+        if (wasHost && !relayModeActive)
+        {
+            StopLanBroadcast();
         }
     }
 
@@ -443,10 +409,6 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
         listenCts = new CancellationTokenSource();
         listenTask = ListenForHostsAsync(listenCts.Token);
         isListeningForDiscovery = true;
-        if (!startAsHost)
-        {
-            lanDiscoveryStartTime = Time.unscaledTime;
-        }
     }
 
     private void StopListeningForHosts()
@@ -467,7 +429,6 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
             listenCts = null;
             listenTask = null;
             isListeningForDiscovery = false;
-            isWaitingForDiscovery = false;
             if (activeListener != null)
             {
                 try
@@ -565,22 +526,29 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
         serverAddress = address;
         serverPort = port;
 
-        Debug.Log($"[NetcodeAutoConnect] Discovered host at {address}:{port}");
+        Debug.Log($"[NetcodeAutoConnect] Discovered host at {address}:{port}. Connecting as client...");
 
-        if (isWaitingForDiscovery)
+        // Connect as client
+        if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer)
         {
-            isWaitingForDiscovery = false;
-            if (!startAsHost && (autoConnectOnStart || pendingManualConnectRequest))
+            var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+            if (transport != null)
             {
-                pendingManualConnectRequest = false;
-                AttemptConnection();
+                transport.SetConnectionData(address, port);
+                relayModeActive = false;
+
+                bool success = NetworkManager.Singleton.StartClient();
+                if (success)
+                {
+                    Debug.Log($"[NetcodeAutoConnect] Connected as Client (LAN) to {address}:{port}");
+                    StopListeningForHosts();
+                }
+                else
+                {
+                    Debug.LogError("[NetcodeAutoConnect] Failed to connect as Client (LAN)");
+                }
             }
         }
-    }
-
-    private bool HasDiscoveredEndpoint()
-    {
-        return !string.IsNullOrEmpty(lastDiscoveredAddress) && lastDiscoveredPort != 0;
     }
 
     private ushort GetTransportPort()
@@ -622,25 +590,19 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
         return null;
     }
 
-    public void SetRelayJoinCode(string joinCode)
+    private async Task<bool> EnsureUnityServicesReadyAsync()
     {
-        manualRelayJoinCode = string.IsNullOrWhiteSpace(joinCode) ? string.Empty : joinCode.Trim().ToUpperInvariant();
-    }
-
-    public string ActiveRelayJoinCode => activeRelayJoinCode;
-    public bool IsUsingRelay => relayModeActive;
-
-    private void InitializeUnityServicesIfNeeded()
-    {
-        if (!enableRelayFallback)
-        {
-            return;
-        }
-
         if (unityServicesInitTask == null)
         {
             unityServicesInitTask = InitializeUnityServicesAsync();
         }
+
+        if (unityServicesInitTask != null)
+        {
+            await unityServicesInitTask;
+        }
+
+        return unityServicesReady;
     }
 
     private async Task InitializeUnityServicesAsync()
@@ -678,18 +640,6 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
         }
     }
 
-    private async Task<bool> EnsureUnityServicesReadyAsync()
-    {
-        InitializeUnityServicesIfNeeded();
-
-        if (unityServicesInitTask != null)
-        {
-            await unityServicesInitTask;
-        }
-
-        return unityServicesReady;
-    }
-
     private async Task<bool> ConfigureRelayHostAsync()
     {
         if (!await EnsureUnityServicesReadyAsync())
@@ -704,7 +654,6 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
             activeRelayJoinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
             hostRelayData = allocation.ToRelayServerData("dtls");
             hostRelayConfigured = true;
-            manualRelayJoinCode = activeRelayJoinCode;
             Debug.Log($"[NetcodeAutoConnect] Relay host ready. Join code: {activeRelayJoinCode}");
             onRelayJoinCodeGenerated?.Invoke(activeRelayJoinCode);
             return true;
@@ -747,211 +696,7 @@ public class SimpleNetcodeAutoConnect : MonoBehaviour
         }
     }
 
-    private bool ConfigureTransportForMode(TransportMode mode)
-    {
-        if (NetworkManager.Singleton == null)
-        {
-            Debug.LogError("[NetcodeAutoConnect] NetworkManager.Singleton is null!");
-            return false;
-        }
-
-        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-        if (transport == null)
-        {
-            Debug.LogError("[NetcodeAutoConnect] UnityTransport component not found!");
-            return false;
-        }
-
-        if (mode == TransportMode.Lan)
-        {
-            transport.SetConnectionData(serverAddress, serverPort);
-            currentTransportMode = TransportMode.Lan;
-            relayModeActive = false;
-            return true;
-        }
-
-        RelayServerData relayData = startAsHost ? hostRelayData : clientRelayData;
-        bool relayConfigured = startAsHost ? hostRelayConfigured : clientRelayConfigured;
-
-        if (!relayConfigured)
-        {
-            Debug.LogError("[NetcodeAutoConnect] Relay data has not been configured for this role.");
-            return false;
-        }
-
-        transport.SetRelayServerData(relayData);
-        currentTransportMode = TransportMode.Relay;
-        relayModeActive = true;
-        return true;
-    }
-
-    private void StartHostRelayFallbackTimer()
-    {
-        if (!enableRelayFallback || !startAsHost || relayModeActive)
-        {
-            return;
-        }
-
-        CancelRelayFallbackTimer();
-        relayWatchdogCts = new CancellationTokenSource();
-        _ = HostRelayFallbackRoutine(relayWatchdogCts.Token);
-    }
-
-    private void CancelRelayFallbackTimer()
-    {
-        if (relayWatchdogCts != null)
-        {
-            relayWatchdogCts.Cancel();
-            relayWatchdogCts.Dispose();
-            relayWatchdogCts = null;
-        }
-    }
-
-    private async Task HostRelayFallbackRoutine(CancellationToken token)
-    {
-        try
-        {
-            await Task.Delay(TimeSpan.FromSeconds(relayHostFallbackDelay), token);
-            if (token.IsCancellationRequested || relayModeActive || !this)
-            {
-                return;
-            }
-
-            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer)
-            {
-                return;
-            }
-
-            if (NetworkManager.Singleton.ConnectedClientsIds.Count > 1)
-            {
-                return; // Already have a remote client over LAN.
-            }
-
-            await SwitchHostToRelayAsync();
-        }
-        catch (TaskCanceledException)
-        {
-            // expected when timer is cancelled
-        }
-    }
-
-    private async Task SwitchHostToRelayAsync()
-    {
-        if (!enableRelayFallback || relayModeActive || !startAsHost)
-        {
-            return;
-        }
-
-        if (NetworkManager.Singleton == null)
-        {
-            return;
-        }
-
-        CancelRelayFallbackTimer();
-
-        if (NetworkManager.Singleton.ConnectedClientsIds.Count > 1)
-        {
-            return;
-        }
-
-        Debug.Log("[NetcodeAutoConnect] No LAN peer detected in time. Switching host to Relay.");
-
-        if (enableLanDiscovery)
-        {
-            StopLanBroadcast();
-        }
-
-        NetworkManager.Singleton.Shutdown();
-        hasConnected = false;
-
-        await Task.Delay(250);
-
-        if (!await ConfigureRelayHostAsync())
-        {
-            Debug.LogError("[NetcodeAutoConnect] Relay host configuration failed. Staying offline.");
-            return;
-        }
-
-        bool started = StartHostInternal(TransportMode.Relay);
-        if (!started)
-        {
-            Debug.LogError("[NetcodeAutoConnect] Failed to relaunch host in Relay mode.");
-        }
-    }
-
-    private async void TryRelayClientFallback()
-    {
-        if (!enableRelayFallback || relayClientFallbackTriggered || relayModeActive || startAsHost)
-        {
-            return;
-        }
-
-        relayClientFallbackTriggered = true;
-
-        if (string.IsNullOrWhiteSpace(manualRelayJoinCode))
-        {
-            Debug.LogWarning("[NetcodeAutoConnect] Relay fallback requested but no join code is set. Call SetRelayJoinCode first.");
-            relayClientFallbackTriggered = false;
-            return;
-        }
-
-        Debug.Log("[NetcodeAutoConnect] No LAN host discovered. Attempting Relay client connection.");
-
-        StopListeningForHosts();
-        pendingManualConnectRequest = false;
-
-        if (!await ConfigureRelayClientAsync(manualRelayJoinCode))
-        {
-            Debug.LogError("[NetcodeAutoConnect] Relay client configuration failed.");
-            relayClientFallbackTriggered = false;
-            return;
-        }
-
-        bool success = StartClientInternal(TransportMode.Relay);
-        if (!success)
-        {
-            Debug.LogError("[NetcodeAutoConnect] Failed to start client in Relay mode.");
-            relayClientFallbackTriggered = false;
-        }
-    }
-
-    private bool StartHostInternal(TransportMode mode)
-    {
-        if (!ConfigureTransportForMode(mode))
-        {
-            return false;
-        }
-
-        bool success = NetworkManager.Singleton.StartHost();
-        if (success)
-        {
-            hasConnected = true;
-            Debug.Log($"[NetcodeAutoConnect] Started as Host ({mode}).");
-            if (mode == TransportMode.Lan)
-            {
-                StartHostRelayFallbackTimer();
-            }
-        }
-        return success;
-    }
-
-    private bool StartClientInternal(TransportMode mode)
-    {
-        if (!ConfigureTransportForMode(mode))
-        {
-            return false;
-        }
-
-        bool success = NetworkManager.Singleton.StartClient();
-        if (success)
-        {
-            hasConnected = true;
-            Debug.Log($"[NetcodeAutoConnect] Started as Client ({mode}).");
-        }
-
-        return success;
-    }
+    // Public properties for external access
+    public string ActiveRelayJoinCode => activeRelayJoinCode;
+    public bool IsUsingRelay => relayModeActive;
 }
-
-
-
