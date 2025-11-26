@@ -22,6 +22,8 @@ public class SimpleMediaStreamSender : MonoBehaviour
     private int currentRetryCount = 0;
     private bool isConnectionEstablished = false;
     private Coroutine connectionTimeoutCoroutine;
+    private Coroutine webRTCUpdateCoroutine; // Track the WebRTC.Update() coroutine
+    private bool isChangingResolution = false; // Prevent multiple simultaneous resolution changes
 
     void Start()
     {
@@ -120,7 +122,12 @@ public class SimpleMediaStreamSender : MonoBehaviour
             videoStreamTrack = new VideoStreamTrack(cameraStream);
             connection.AddTrack(videoStreamTrack);
 
-            StartCoroutine(WebRTC.Update());
+            // Start WebRTC.Update() coroutine and track it
+            if (webRTCUpdateCoroutine != null)
+            {
+                StopCoroutine(webRTCUpdateCoroutine);
+            }
+            webRTCUpdateCoroutine = StartCoroutine(WebRTC.Update());
 
             SetupSignalingListeners();
         }
@@ -300,6 +307,7 @@ public class SimpleMediaStreamSender : MonoBehaviour
 
     /// <summary>
     /// Change the RenderTexture resolution. Called when client requests resolution change.
+    /// Recreates the VideoStreamTrack so WebRTC picks up the new resolution.
     /// </summary>
     private void ChangeResolution(int width, int height)
     {
@@ -315,15 +323,122 @@ public class SimpleMediaStreamSender : MonoBehaviour
             return;
         }
 
+        if (connection == null || connection.ConnectionState != RTCPeerConnectionState.Connected)
+        {
+            Debug.LogWarning("[SimpleMediaStreamSender] Cannot change resolution: WebRTC connection not established");
+            return;
+        }
+
+        if (isChangingResolution)
+        {
+            Debug.LogWarning("[SimpleMediaStreamSender] Resolution change already in progress. Ignoring request.");
+            return;
+        }
+
+        // Check if resolution is actually changing
+        if (cameraStream.width == width && cameraStream.height == height)
+        {
+            Debug.Log($"[SimpleMediaStreamSender] Resolution is already {width}x{height}. No change needed.");
+            return;
+        }
+
         Debug.Log($"[SimpleMediaStreamSender] Changing resolution to {width}x{height}");
 
-        // Simply resize the RenderTexture - WebRTC should handle it automatically
+        // Resize the RenderTexture
         cameraStream.Release();
         cameraStream.width = width;
         cameraStream.height = height;
         cameraStream.Create();
 
-        Debug.Log($"[SimpleMediaStreamSender] Resolution changed to {width}x{height}. Testing without renegotiation...");
+        // Recreate the VideoStreamTrack with the new RenderTexture
+        // This is necessary because VideoStreamTrack doesn't automatically update when RenderTexture changes
+        StartCoroutine(RecreateVideoTrack());
+    }
+
+    private IEnumerator RecreateVideoTrack()
+    {
+        isChangingResolution = true;
+
+        if (connection == null || videoStreamTrack == null)
+        {
+            Debug.LogError("[SimpleMediaStreamSender] Cannot recreate video track: connection or track is null");
+            isChangingResolution = false;
+            yield break;
+        }
+
+        Debug.Log("[SimpleMediaStreamSender] Recreating VideoStreamTrack with new resolution...");
+
+        // Find the sender for the current track
+        RTCRtpSender videoSender = null;
+        var senders = connection.GetSenders();
+        foreach (var sender in senders)
+        {
+            if (sender.Track == videoStreamTrack)
+            {
+                videoSender = sender;
+                break;
+            }
+        }
+
+        if (videoSender == null)
+        {
+            Debug.LogError("[SimpleMediaStreamSender] Could not find sender for current video track!");
+            isChangingResolution = false;
+            yield break;
+        }
+
+        // Store reference to old track for cleanup
+        var oldTrack = videoStreamTrack;
+
+        // Create new VideoStreamTrack with the resized RenderTexture FIRST
+        var newTrack = new VideoStreamTrack(cameraStream);
+
+        // Use ReplaceTrack instead of Remove/Add to avoid accumulation
+        // ReplaceTrack returns bool (true if successful)
+        bool replaceSuccess = videoSender.ReplaceTrack(newTrack);
+        
+        if (!replaceSuccess)
+        {
+            Debug.LogError("[SimpleMediaStreamSender] Failed to replace track");
+            newTrack.Dispose();
+            isChangingResolution = false;
+            yield break;
+        }
+        
+        // Wait a frame for the replacement to take effect
+        yield return null;
+
+        // Now stop and dispose the old track
+        oldTrack.Stop();
+        oldTrack.Dispose();
+        videoStreamTrack = newTrack;
+
+        Debug.Log($"[SimpleMediaStreamSender] VideoStreamTrack replaced. Waiting for negotiation to complete...");
+        
+        // Wait for negotiation to complete before allowing another change
+        yield return new WaitUntil(() => connection.SignalingState == RTCSignalingState.Stable);
+        
+        // Wait a bit more to ensure everything is settled
+        yield return new WaitForSeconds(0.5f);
+
+        // Verify we only have one video track
+        var finalSenders = connection.GetSenders();
+        var videoTrackCount = 0;
+        foreach (var sender in finalSenders)
+        {
+            if (sender.Track != null && sender.Track is VideoStreamTrack)
+            {
+                videoTrackCount++;
+            }
+        }
+
+        if (videoTrackCount != 1)
+        {
+            Debug.LogWarning($"[SimpleMediaStreamSender] Warning: Expected 1 video track, found {videoTrackCount}!");
+        }
+
+        isChangingResolution = false;
+        Debug.Log($"[SimpleMediaStreamSender] Resolution change complete. New resolution: {cameraStream.width}x{cameraStream.height}");
     }
 
     void OnDestroy()
@@ -340,6 +455,12 @@ public class SimpleMediaStreamSender : MonoBehaviour
             signaling.OnResolutionChangeRequested -= null;
         }
 
+        if (webRTCUpdateCoroutine != null)
+        {
+            StopCoroutine(webRTCUpdateCoroutine);
+            webRTCUpdateCoroutine = null;
+        }
+
         if (connection != null)
         {
             connection.Close();
@@ -349,6 +470,7 @@ public class SimpleMediaStreamSender : MonoBehaviour
         if (videoStreamTrack != null)
         {
             videoStreamTrack.Stop();
+            videoStreamTrack.Dispose();
             videoStreamTrack = null;
         }
     }
