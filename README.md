@@ -3,17 +3,16 @@
 ## Setup
 
 **You need two devices/apps:**
-- **Sender (Host)**: The device that streams video
-- **Receiver (Client)**: The device that receives and displays the stream
+- **Sender (Headset)**: The device that streams video
+- **Receiver (Tablet)**: The device that receives and displays the stream
 
 ## Connection Steps
 
 ### Option 1: LAN Connection (Same Network)
 
-1. **On Sender**: Click **"Start with LAN"** button
-2. **On Receiver**: Click **"Start with LAN"** button
-3. Wait a few seconds for connection to establish
-4. Video stream should appear on the receiver
+1. **On Sender and on Receiver**: Click **"Start with LAN"** button
+2. Wait a few seconds for connection to establish
+3. Video stream should appear on the receiver
 
 ### Option 2: Relay Connection (Internet)
 
