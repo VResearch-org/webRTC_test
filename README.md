@@ -10,7 +10,7 @@
 
 ### Option 1: LAN Connection (Same Network)
 
-1. **On Sender and on Receiver**: Click **"Start with LAN"** button
+1. **On both Sender and Receiver**: Click **"Start with LAN"** button
 2. Wait a few seconds for connection to establish
 3. Video stream should appear on the receiver
 
