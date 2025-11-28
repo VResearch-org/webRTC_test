@@ -499,42 +499,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1842062947}
     m_Modifications:
-    - target: {fileID: 384570417970093881, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchorMax.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 384570417970093881, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchorMin.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 384570417970093881, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchoredPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 384570417970093881, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 394063569971654092, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
       propertyPath: m_OnValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Target
       value: 
       objectReference: {fileID: 848699179}
-    - target: {fileID: 678545995171913588, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchorMax.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 678545995171913588, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchorMin.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 678545995171913588, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchoredPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 678545995171913588, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 872207953959316816, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -555,22 +523,6 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 1721639372636707219, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchorMax.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1721639372636707219, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchorMin.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1721639372636707219, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchoredPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1721639372636707219, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 2917725308791186761, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -579,22 +531,6 @@ PrefabInstance:
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
       value: 
       objectReference: {fileID: 848699179}
-    - target: {fileID: 3753470314386720255, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchorMax.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3753470314386720255, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchorMin.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3753470314386720255, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchoredPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3753470314386720255, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
-      propertyPath: m_AnchoredPosition.y
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 4039922016913766338, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -611,6 +547,34 @@ PrefabInstance:
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5471312590882573653, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5471312590882573653, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5471312590882573653, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Target
+      value: 
+      objectReference: {fileID: 161995114}
+    - target: {fileID: 5471312590882573653, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_CallState
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5471312590882573653, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
+      value: SetReceiverAudioEnabled
+      objectReference: {fileID: 0}
+    - target: {fileID: 5471312590882573653, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
+      value: SimpleMediaStreamReceiver, Assembly-CSharp
+      objectReference: {fileID: 0}
+    - target: {fileID: 5471312590882573653, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
+      value: UnityEngine.Object, UnityEngine
+      objectReference: {fileID: 0}
     - target: {fileID: 5541767874231955330, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -626,6 +590,34 @@ PrefabInstance:
     - target: {fileID: 5541767874231955330, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5761901400149074271, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5761901400149074271, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Mode
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5761901400149074271, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Target
+      value: 
+      objectReference: {fileID: 161995114}
+    - target: {fileID: 5761901400149074271, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_CallState
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5761901400149074271, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_MethodName
+      value: SetSenderAudioEnabled
+      objectReference: {fileID: 0}
+    - target: {fileID: 5761901400149074271, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_TargetAssemblyTypeName
+      value: SimpleMediaStreamReceiver, Assembly-CSharp
+      objectReference: {fileID: 0}
+    - target: {fileID: 5761901400149074271, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
+      propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[0].m_Arguments.m_ObjectArgumentAssemblyTypeName
+      value: UnityEngine.Object, UnityEngine
       objectReference: {fileID: 0}
     - target: {fileID: 6226983963781677024, guid: d0b2ed0a9280a8e4aa0d2ca76cc14959, type: 3}
       propertyPath: m_AnchorMax.y

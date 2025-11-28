@@ -27,6 +27,7 @@ public class NetcodeWebRTCSignaling : NetworkBehaviour
     public event Action<float> OnVideoProgressUpdated; // progress 0-1
     public event Action<float, float> OnVideoTimeUpdated; // currentTime, totalLength
     public event Action OnSkipBackRequested; // reset video to first frame
+    public event Action<bool> OnSenderAudioControlRequested; // true = enable, false = disable (from receiver to sender)
 
     private bool isInitialized = false;
 
@@ -259,6 +260,24 @@ public class NetcodeWebRTCSignaling : NetworkBehaviour
     {
         // Server receives the request and triggers the event
         OnSkipBackRequested?.Invoke();
+    }
+
+    /// <summary>
+    /// Request sender audio control from client (receiver) to server (sender)
+    /// </summary>
+    public void RequestSenderAudioControl(bool enabled)
+    {
+        if (IsClient)
+        {
+            RequestSenderAudioControlServerRpc(enabled);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestSenderAudioControlServerRpc(bool enabled)
+    {
+        // Server (sender) receives the request and triggers the event
+        OnSenderAudioControlRequested?.Invoke(enabled);
     }
 }
 

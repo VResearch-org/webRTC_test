@@ -15,6 +15,10 @@ public class SimpleMediaStreamSender : MonoBehaviour
 
     private RTCPeerConnection connection;
     private VideoStreamTrack videoStreamTrack;
+    private AudioStreamTrack audioStreamTrack; // Sender's microphone audio
+    private AudioSource microphoneAudioSource; // AudioSource for microphone capture
+    private RTCRtpSender audioSender; // Track the audio sender for dynamic enable/disable
+    private AudioSource receivedAudioSource; // Audio source for playing received audio
     private NetcodeWebRTCSignaling signaling;
 
     private bool answerReceived = false;
@@ -24,6 +28,7 @@ public class SimpleMediaStreamSender : MonoBehaviour
     private Coroutine connectionTimeoutCoroutine;
     private Coroutine webRTCUpdateCoroutine; // Track the WebRTC.Update() coroutine
     private bool isChangingResolution = false; // Prevent multiple simultaneous resolution changes
+    private bool senderAudioEnabled = false; // Track sender audio state
 
     void Start()
     {
@@ -119,6 +124,31 @@ public class SimpleMediaStreamSender : MonoBehaviour
 
             connection.OnNegotiationNeeded = () => StartCoroutine(CreateAndSendOffer());
 
+            // Handle incoming tracks (audio from receiver)
+            connection.OnTrack = e =>
+            {
+                try
+                {
+                    if (e.Track is AudioStreamTrack audio)
+                    {
+                        // Play audio from receiver (therapist)
+                        if (receivedAudioSource == null)
+                        {
+                            receivedAudioSource = gameObject.AddComponent<AudioSource>();
+                            receivedAudioSource.loop = false;
+                            receivedAudioSource.playOnAwake = false;
+                        }
+                        receivedAudioSource.SetTrack(audio);
+                        receivedAudioSource.Play();
+                        Debug.Log("[SimpleMediaStreamSender] Received audio from receiver");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[SimpleMediaStreamSender] Error handling audio track: {ex.Message}");
+                }
+            };
+
             videoStreamTrack = new VideoStreamTrack(cameraStream);
             connection.AddTrack(videoStreamTrack);
 
@@ -180,9 +210,35 @@ public class SimpleMediaStreamSender : MonoBehaviour
             videoStreamTrack = null;
         }
 
+        if (audioStreamTrack != null)
+        {
+            audioStreamTrack.Stop();
+            audioStreamTrack.Dispose();
+            audioStreamTrack = null;
+        }
+
+        if (microphoneAudioSource != null)
+        {
+            if (Microphone.devices.Length > 0)
+            {
+                Microphone.End(Microphone.devices[0]);
+            }
+            Destroy(microphoneAudioSource);
+            microphoneAudioSource = null;
+        }
+
+        if (receivedAudioSource != null)
+        {
+            Destroy(receivedAudioSource);
+            receivedAudioSource = null;
+        }
+
+        audioSender = null;
+
         // Reset state
         answerReceived = false;
         isConnectionEstablished = false;
+        senderAudioEnabled = false;
         
         // Reinitialize connection
         InitializeConnection();
@@ -231,6 +287,12 @@ public class SimpleMediaStreamSender : MonoBehaviour
         signaling.OnResolutionChangeRequested += (width, height) =>
         {
             ChangeResolution(width, height);
+        };
+
+        signaling.OnSenderAudioControlRequested += (enabled) =>
+        {
+            // Receiver requested to enable/disable sender audio
+            SetSenderAudioEnabled(enabled);
         };
     }
 
@@ -453,6 +515,7 @@ public class SimpleMediaStreamSender : MonoBehaviour
             signaling.OnAnswerReceived -= null;
             signaling.OnIceCandidateReceived -= null;
             signaling.OnResolutionChangeRequested -= null;
+            signaling.OnSenderAudioControlRequested -= null;
         }
 
         if (webRTCUpdateCoroutine != null)
@@ -472,6 +535,166 @@ public class SimpleMediaStreamSender : MonoBehaviour
             videoStreamTrack.Stop();
             videoStreamTrack.Dispose();
             videoStreamTrack = null;
+        }
+
+        if (audioStreamTrack != null)
+        {
+            audioStreamTrack.Stop();
+            audioStreamTrack.Dispose();
+            audioStreamTrack = null;
+        }
+
+        if (microphoneAudioSource != null)
+        {
+            if (Microphone.devices.Length > 0)
+            {
+                Microphone.End(Microphone.devices[0]);
+            }
+            Destroy(microphoneAudioSource);
+            microphoneAudioSource = null;
+        }
+
+        if (receivedAudioSource != null)
+        {
+            Destroy(receivedAudioSource);
+            receivedAudioSource = null;
+        }
+    }
+
+    /// <summary>
+    /// Public method to enable/disable sender audio transmission (client's microphone).
+    /// Can be attached to a UI Toggle's OnValueChanged event.
+    /// </summary>
+    /// <param name="enabled">True to enable sender audio, false to disable</param>
+    public void SetSenderAudioEnabled(bool enabled)
+    {
+        if (senderAudioEnabled == enabled)
+        {
+            return; // No change needed
+        }
+
+        senderAudioEnabled = enabled;
+
+        if (connection == null || connection.ConnectionState != RTCPeerConnectionState.Connected)
+        {
+            Debug.LogWarning("[SimpleMediaStreamSender] Cannot toggle audio: WebRTC connection not established");
+            senderAudioEnabled = false;
+            return;
+        }
+
+        if (enabled)
+        {
+            // Enable sender audio
+            StartCoroutine(EnableSenderAudio());
+        }
+        else
+        {
+            // Disable sender audio
+            StartCoroutine(DisableSenderAudio());
+        }
+    }
+
+    private IEnumerator EnableSenderAudio()
+    {
+        if (audioStreamTrack != null)
+        {
+            Debug.LogWarning("[SimpleMediaStreamSender] Audio track already exists");
+            yield break;
+        }
+
+        // Create AudioSource for microphone capture
+        if (microphoneAudioSource == null)
+        {
+            microphoneAudioSource = gameObject.AddComponent<AudioSource>();
+            microphoneAudioSource.loop = true;
+            microphoneAudioSource.playOnAwake = false;
+            
+            // Start microphone capture
+            string microphoneName = Microphone.devices.Length > 0 ? Microphone.devices[0] : null;
+            if (string.IsNullOrEmpty(microphoneName))
+            {
+                Debug.LogError("[SimpleMediaStreamSender] No microphone device found");
+                senderAudioEnabled = false;
+                yield break;
+            }
+            
+            microphoneAudioSource.clip = Microphone.Start(microphoneName, true, 10, 48000);
+            if (microphoneAudioSource.clip == null)
+            {
+                Debug.LogError("[SimpleMediaStreamSender] Failed to start microphone");
+                senderAudioEnabled = false;
+                yield break;
+            }
+            
+            // Wait for microphone to start (yield outside try-catch)
+            while (!(Microphone.GetPosition(microphoneName) > 0))
+            {
+                yield return null;
+            }
+            
+            microphoneAudioSource.Play();
+        }
+        
+        // Create AudioStreamTrack from the AudioSource (in try-catch for safety)
+        try
+        {
+            audioStreamTrack = new AudioStreamTrack(microphoneAudioSource);
+            audioSender = connection.AddTrack(audioStreamTrack);
+            Debug.Log("[SimpleMediaStreamSender] Sender audio enabled");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[SimpleMediaStreamSender] Failed to enable sender audio: {e.Message}");
+            senderAudioEnabled = false;
+            if (audioStreamTrack != null)
+            {
+                audioStreamTrack.Dispose();
+                audioStreamTrack = null;
+            }
+            if (microphoneAudioSource != null)
+            {
+                if (Microphone.devices.Length > 0)
+                {
+                    Microphone.End(Microphone.devices[0]);
+                }
+                Destroy(microphoneAudioSource);
+                microphoneAudioSource = null;
+            }
+        }
+    }
+
+    private IEnumerator DisableSenderAudio()
+    {
+        if (audioSender == null || audioStreamTrack == null)
+        {
+            yield break;
+        }
+
+        try
+        {
+            connection.RemoveTrack(audioSender);
+            audioStreamTrack.Stop();
+            audioStreamTrack.Dispose();
+            audioStreamTrack = null;
+            audioSender = null;
+            
+            // Stop microphone
+            if (microphoneAudioSource != null)
+            {
+                if (Microphone.devices.Length > 0)
+                {
+                    Microphone.End(Microphone.devices[0]);
+                }
+                microphoneAudioSource.Stop();
+                Destroy(microphoneAudioSource);
+                microphoneAudioSource = null;
+            }
+            
+            Debug.Log("[SimpleMediaStreamSender] Sender audio disabled");
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[SimpleMediaStreamSender] Failed to disable sender audio: {e.Message}");
         }
     }
 }
