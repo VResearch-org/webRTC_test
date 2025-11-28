@@ -29,6 +29,7 @@ public class SimpleMediaStreamSender : MonoBehaviour
     private Coroutine webRTCUpdateCoroutine; // Track the WebRTC.Update() coroutine
     private bool isChangingResolution = false; // Prevent multiple simultaneous resolution changes
     private bool senderAudioEnabled = false; // Track sender audio state
+    private bool isNegotiating = false; // Track if we're currently negotiating
 
     void Start()
     {
@@ -122,7 +123,13 @@ public class SimpleMediaStreamSender : MonoBehaviour
                 }
             };
 
-            connection.OnNegotiationNeeded = () => StartCoroutine(CreateAndSendOffer());
+            connection.OnNegotiationNeeded = () =>
+            {
+                if (!isNegotiating)
+                {
+                    StartCoroutine(CreateAndSendOffer());
+                }
+            };
 
             // Handle incoming tracks (audio from receiver)
             connection.OnTrack = e =>
@@ -131,16 +138,24 @@ public class SimpleMediaStreamSender : MonoBehaviour
                 {
                     if (e.Track is AudioStreamTrack audio)
                     {
-                        // Play audio from receiver (therapist)
-                        if (receivedAudioSource == null)
+                        // Stop any existing received audio first to prevent feedback
+                        if (receivedAudioSource != null)
+                        {
+                            receivedAudioSource.Stop();
+                            receivedAudioSource.SetTrack(null);
+                        }
+                        else
                         {
                             receivedAudioSource = gameObject.AddComponent<AudioSource>();
                             receivedAudioSource.loop = false;
                             receivedAudioSource.playOnAwake = false;
                         }
+                        
+                        // Mute received audio if we're sending audio to prevent echo
+                        receivedAudioSource.mute = senderAudioEnabled;
                         receivedAudioSource.SetTrack(audio);
                         receivedAudioSource.Play();
-                        Debug.Log("[SimpleMediaStreamSender] Received audio from receiver");
+                        Debug.Log($"[SimpleMediaStreamSender] Received audio from receiver (muted: {receivedAudioSource.mute})");
                     }
                 }
                 catch (Exception ex)
@@ -298,10 +313,18 @@ public class SimpleMediaStreamSender : MonoBehaviour
 
     IEnumerator CreateAndSendOffer()
     {
+        if (isNegotiating)
+        {
+            Debug.LogWarning("[SimpleMediaStreamSender] Negotiation already in progress, skipping");
+            yield break;
+        }
+
+        isNegotiating = true;
+        
         yield return new WaitUntil(() => connection.SignalingState == RTCSignalingState.Stable);
 
         // Wait for a moment to ensure the connection is ready
-        yield return new WaitForSeconds(1f);
+        yield return new WaitForSeconds(0.1f);
 
         var offerOp = connection.CreateOffer();
         yield return offerOp;
@@ -309,6 +332,7 @@ public class SimpleMediaStreamSender : MonoBehaviour
         if (offerOp.IsError)
         {
             Debug.LogError($"Error creating offer: {offerOp.Error.message}");
+            isNegotiating = false;
             yield break;
         }
 
@@ -319,6 +343,7 @@ public class SimpleMediaStreamSender : MonoBehaviour
         if (setLocalOp.IsError)
         {
             Debug.LogError($"Error setting local description: {setLocalOp.Error.message}");
+            isNegotiating = false;
             yield break;
         }
 
@@ -339,6 +364,10 @@ public class SimpleMediaStreamSender : MonoBehaviour
         {
             Debug.LogError($"Error sending offer: {e.Message}");
         }
+        
+        // Wait for answer or timeout
+        yield return new WaitUntil(() => connection.SignalingState == RTCSignalingState.Stable || connection.ConnectionState == RTCPeerConnectionState.Closed);
+        isNegotiating = false;
     }
 
     void Update()
@@ -582,6 +611,13 @@ public class SimpleMediaStreamSender : MonoBehaviour
             return;
         }
 
+        // Update received audio mute state to prevent echo
+        if (receivedAudioSource != null)
+        {
+            receivedAudioSource.mute = enabled;
+            Debug.Log($"[SimpleMediaStreamSender] Received audio muted: {enabled} (to prevent echo)");
+        }
+
         if (enabled)
         {
             // Enable sender audio
@@ -602,12 +638,19 @@ public class SimpleMediaStreamSender : MonoBehaviour
             yield break;
         }
 
+        // Wait for any ongoing negotiation to complete
+        while (isNegotiating)
+        {
+            yield return new WaitForSeconds(0.1f);
+        }
+
         // Create AudioSource for microphone capture
         if (microphoneAudioSource == null)
         {
             microphoneAudioSource = gameObject.AddComponent<AudioSource>();
             microphoneAudioSource.loop = true;
             microphoneAudioSource.playOnAwake = false;
+            microphoneAudioSource.mute = false; // Ensure mic is not muted
             
             // Start microphone capture
             string microphoneName = Microphone.devices.Length > 0 ? Microphone.devices[0] : null;
@@ -636,11 +679,12 @@ public class SimpleMediaStreamSender : MonoBehaviour
         }
         
         // Create AudioStreamTrack from the AudioSource (in try-catch for safety)
+        bool trackCreated = false;
         try
         {
             audioStreamTrack = new AudioStreamTrack(microphoneAudioSource);
             audioSender = connection.AddTrack(audioStreamTrack);
-            Debug.Log("[SimpleMediaStreamSender] Sender audio enabled");
+            trackCreated = true;
         }
         catch (Exception e)
         {
@@ -648,6 +692,7 @@ public class SimpleMediaStreamSender : MonoBehaviour
             senderAudioEnabled = false;
             if (audioStreamTrack != null)
             {
+                audioStreamTrack.Stop();
                 audioStreamTrack.Dispose();
                 audioStreamTrack = null;
             }
@@ -657,9 +702,19 @@ public class SimpleMediaStreamSender : MonoBehaviour
                 {
                     Microphone.End(Microphone.devices[0]);
                 }
+                microphoneAudioSource.Stop();
                 Destroy(microphoneAudioSource);
                 microphoneAudioSource = null;
             }
+            yield break;
+        }
+        
+        if (trackCreated)
+        {
+            // Wait for negotiation to complete
+            yield return new WaitUntil(() => connection.SignalingState == RTCSignalingState.Stable || !isConnectionEstablished);
+            
+            Debug.Log("[SimpleMediaStreamSender] Sender audio enabled");
         }
     }
 
@@ -667,15 +722,53 @@ public class SimpleMediaStreamSender : MonoBehaviour
     {
         if (audioSender == null || audioStreamTrack == null)
         {
+            // Clean up any remaining resources
+            if (audioStreamTrack != null)
+            {
+                audioStreamTrack.Stop();
+                audioStreamTrack.Dispose();
+                audioStreamTrack = null;
+            }
+            if (microphoneAudioSource != null)
+            {
+                if (Microphone.devices.Length > 0)
+                {
+                    Microphone.End(Microphone.devices[0]);
+                }
+                microphoneAudioSource.Stop();
+                Destroy(microphoneAudioSource);
+                microphoneAudioSource = null;
+            }
+            audioSender = null;
             yield break;
         }
 
+        bool trackRemoved = false;
         try
         {
-            connection.RemoveTrack(audioSender);
+            // Stop the track first
             audioStreamTrack.Stop();
-            audioStreamTrack.Dispose();
-            audioStreamTrack = null;
+            
+            // Remove from connection (this will trigger renegotiation)
+            connection.RemoveTrack(audioSender);
+            trackRemoved = true;
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[SimpleMediaStreamSender] Failed to disable sender audio: {e.Message}");
+        }
+        
+        if (trackRemoved)
+        {
+            // Wait for negotiation to complete
+            yield return new WaitUntil(() => connection.SignalingState == RTCSignalingState.Stable || !isConnectionEstablished);
+            
+            // Dispose the track
+            if (audioStreamTrack != null)
+            {
+                audioStreamTrack.Dispose();
+                audioStreamTrack = null;
+            }
             audioSender = null;
             
             // Stop microphone
@@ -690,11 +783,13 @@ public class SimpleMediaStreamSender : MonoBehaviour
                 microphoneAudioSource = null;
             }
             
+            // Unmute received audio now that we're not sending
+            if (receivedAudioSource != null)
+            {
+                receivedAudioSource.mute = false;
+            }
+            
             Debug.Log("[SimpleMediaStreamSender] Sender audio disabled");
-        }
-        catch (Exception e)
-        {
-            Debug.LogError($"[SimpleMediaStreamSender] Failed to disable sender audio: {e.Message}");
         }
     }
 }
