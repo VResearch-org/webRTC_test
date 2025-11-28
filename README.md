@@ -45,7 +45,7 @@
 
 - **No restart button**: To restart, close and reopen both apps
 - **Protocol switching**: To switch between LAN and Relay, you must restart **both** apps
-- **Connection required**: Video player controls require an active connection
+- **Connection required**: Video and audio controls require an active connection
 
 ## Troubleshooting
 
