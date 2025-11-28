@@ -32,6 +32,15 @@
 - **Skip Back Button**: Resets video to the beginning
 - **Resolution Dropdown**: Change streaming quality (SD, HD, Full HD, QHD)
 
+## Using Audio Controls
+
+**⚠️ Important**: Audio controls are located on the **Receiver (Tablet)** device. Both toggles default to **OFF**.
+
+- **Sender Audio Toggle**: Controls the headset's microphone (enables/disables audio from sender to receiver)
+- **Receiver Audio Toggle**: Controls the tablet's microphone (enables/disables audio from receiver to sender)
+
+**Note**: Audio controls require an active connection. Echo cancellation is automatic - received audio is muted when your microphone is active to prevent feedback.
+
 ## Limitations
 
 - **No restart button**: To restart, close and reopen both apps
